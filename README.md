@@ -24,6 +24,17 @@ Get smart suggestions to optimize and reduce subscription costs
 ⚙️ Settings & Preferences
 Customize categories, notifications, and user preferences
 
+🛠️ Tech Stack
+Technology	             |Purpose
+React 19 + TypeScript	   |Modern UI development
+Vite	                   |Fast build tool
+Tailwind CSS v4	         |Utility-first styling
+Zustand	                 |Global state management
+Recharts	               |Data visualization
+Framer Motion	           |Animations
+date-fns	               |Date handling
+Lucide React	           |Icons
+
 📦 Installation
 --------------------------------------------
 # Clone the repository
