@@ -31,36 +31,38 @@ Let Sublytics detect your subscriptions
 Explore your dashboard and analytics
 Optimize your spending with AI insights
 
-📁 PROJECT STRUCTURE
---------------------------------------------
+## 📁 Project Structure
+
+```
 Sublytics/
 ├── node_modules/          # Dependencies
 ├── src/                   # Source code
 │   ├── components/        # Reusable UI components
 │   │   ├── auth/         # Authentication-related components
 │   │   ├── dashboard/    # Dashboard-specific components
-│   │   ├── layout/       # Layout components (Header, Sidebar, Layout)
+│   │   ├── layout/       # Layout components
 │   │   ├── subscriptions/# Subscription-related components
-│   │   └── ui/           # Generic UI components (Button, Card, Input, etc.)
-│   ├── pages/            # Page components
+│   │   └── ui/           # Generic UI components
+│   ├── pages/
 │   │   ├── AnalyticsPage.tsx
 │   │   ├── AuthPage.tsx
 │   │   ├── DashboardPage.tsx
 │   │   ├── SettingsPage.tsx
 │   │   └── SubscriptionsPage.tsx
-│   ├── store/            # State management (Zustand)
+│   ├── store/
 │   │   └── useStore.ts
-│   ├── types/            # TypeScript type definitions
+│   ├── types/
 │   │   └── index.ts
-│   ├── utils/            # Utility functions
-│   │   ├── cn.ts         # Class name utility (tailwind-merge + clsx)
-│   │   └── formatters.ts # Date/number formatting utilities
-│   ├── App.tsx           # Main app component
-│   ├── main.tsx          # Entry point
-│   └── index.css         # Global styles
-├── .kilo/               # Kilo configuration
-├── index.html           # HTML entry point
-├── package.json         # Project dependencies and scripts
-├── tsconfig.json        # TypeScript configuration
-├── vite.config.ts       # Vite configuration
-└── README.md           # Project documentation
+│   ├── utils/
+│   │   ├── cn.ts
+│   │   └── formatters.ts
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── index.css
+├── .kilo/
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+```
