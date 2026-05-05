@@ -31,38 +31,34 @@ Let Sublytics detect your subscriptions
 Explore your dashboard and analytics
 Optimize your spending with AI insights
 
-## 📁 Project Structure
-
-```
 Sublytics/
-├── node_modules/          # Dependencies
-├── src/                   # Source code
+├── node_modules/          # Project dependencies (auto-generated)
+├── src/                   # Main source code
 │   ├── components/        # Reusable UI components
-│   │   ├── auth/         # Authentication-related components
-│   │   ├── dashboard/    # Dashboard-specific components
-│   │   ├── layout/       # Layout components
-│   │   ├── subscriptions/# Subscription-related components
-│   │   └── ui/           # Generic UI components
-│   ├── pages/
+│   │   ├── auth/          # Authentication-related components
+│   │   ├── dashboard/     # Dashboard-specific UI components
+│   │   ├── layout/        # Layout components (Header, Sidebar, etc.)
+│   │   ├── subscriptions/ # Subscription-related components
+│   │   └── ui/            # Generic UI elements (Button, Card, Input)
+│   ├── pages/             # Application pages (routes)
 │   │   ├── AnalyticsPage.tsx
 │   │   ├── AuthPage.tsx
 │   │   ├── DashboardPage.tsx
 │   │   ├── SettingsPage.tsx
 │   │   └── SubscriptionsPage.tsx
-│   ├── store/
+│   ├── store/             # Global state management (Zustand)
 │   │   └── useStore.ts
-│   ├── types/
+│   ├── types/             # TypeScript type definitions
 │   │   └── index.ts
-│   ├── utils/
-│   │   ├── cn.ts
-│   │   └── formatters.ts
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── index.css
-├── .kilo/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── README.md
-```
+│   ├── utils/             # Utility/helper functions
+│   │   ├── cn.ts          # Classname utility (clsx + tailwind-merge)
+│   │   └── formatters.ts  # Date & number formatting
+│   ├── App.tsx            # Root React component
+│   ├── main.tsx           # Application entry point
+│   └── index.css          # Global styles
+├── .kilo/                 # Kilo configuration files
+├── index.html             # HTML template
+├── package.json           # Dependencies & scripts
+├── tsconfig.json          # TypeScript configuration
+├── vite.config.ts         # Vite build configuration
+└── README.md              # Project documentation
