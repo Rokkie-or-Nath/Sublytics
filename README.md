@@ -31,6 +31,9 @@ Let Sublytics detect your subscriptions
 Explore your dashboard and analytics
 Optimize your spending with AI insights
 
+### 📁 Project Structure
+
+```
 Sublytics/
 ├── node_modules/          # Project dependencies (auto-generated)
 ├── src/                   # Main source code
@@ -62,3 +65,4 @@ Sublytics/
 ├── tsconfig.json          # TypeScript configuration
 ├── vite.config.ts         # Vite build configuration
 └── README.md              # Project documentation
+```
