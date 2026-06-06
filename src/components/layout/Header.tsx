@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { Search, Bell, Plus, Menu, Diamond, LogOut, User } from 'lucide-react';
+import { Search, Bell, Plus, Menu, Diamond, LogOut, User, X, BellOff } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PAGE_TITLES } from '../../constants/defaults';
 
 export function Header() {
-  const { searchQuery, setSearchQuery, setIsAddModalOpen, currentPage, setCurrentPage, user, logout } = useStore();
+  const { searchQuery, setSearchQuery, setIsAddModalOpen, currentPage, setCurrentPage, user, logout, notifications, setNotifications } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notifications] = useState(true);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
-  const pageTitles: Record<string, string> = {
-    dashboard: 'Dashboard',
-    subscriptions: 'Subscriptions',
-    analytics: 'Analytics',
-    settings: 'Settings',
-  };
 
   const handleLogout = () => {
     setUserMenuOpen(false);
@@ -42,7 +37,7 @@ export function Header() {
 
         {/* Page title - desktop */}
         <div className="hidden lg:block">
-          <h2 className="text-xl font-semibold text-text-primary">{pageTitles[currentPage]}</h2>
+          <h2 className="text-xl font-semibold text-text-primary">{PAGE_TITLES[currentPage] || 'Dashboard'}</h2>
         </div>
 
         {/* Search */}
@@ -58,12 +53,60 @@ export function Header() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <button className="relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors">
-            <Bell className="w-5 h-5" />
-            {notifications && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-alert rounded-full" />
-            )}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifPanel(!showNotifPanel)}
+              className="relative p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+              aria-label="Toggle notifications"
+            >
+              {notifications ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+              {notifications && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-alert rounded-full" />
+              )}
+            </button>
+            <AnimatePresence>
+              {showNotifPanel && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                    className="absolute right-0 top-full mt-2 w-72 bg-bg-surface border border-border rounded-xl shadow-2xl shadow-black/30 z-50 overflow-hidden"
+                  >
+                    <div className="p-4 border-b border-border flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setNotifications(!notifications); }}
+                          className={`text-xs px-2 py-1 rounded-lg transition-colors ${notifications ? 'bg-accent/10 text-accent' : 'bg-bg-elevated text-text-muted'}`}
+                        >
+                          {notifications ? 'On' : 'Off'}
+                        </button>
+                        <button onClick={() => setShowNotifPanel(false)} className="text-text-muted hover:text-text-primary">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-4 text-center text-sm text-text-muted">
+                      {notifications
+                        ? 'No new notifications. You\'re all caught up!'
+                        : 'Notifications are disabled. Enable them in Settings.'
+                      }
+                    </div>
+                    <div className="p-3 border-t border-border">
+                      <button
+                        onClick={() => { setShowNotifPanel(false); setCurrentPage('settings'); }}
+                        className="w-full text-center text-xs text-accent hover:text-accent-bright transition-colors"
+                      >
+                        Manage notification settings
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
           <Button
             size="sm"
             leftIcon={<Plus className="w-4 h-4" />}

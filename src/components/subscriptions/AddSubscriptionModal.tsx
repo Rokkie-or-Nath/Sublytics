@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useStore, categories } from '../../store/useStore';
+import { useStore } from '../../store/useStore';
+import { CATEGORIES } from '../../constants/categories';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -41,7 +42,7 @@ export function AddSubscriptionModal() {
       return;
     }
 
-    const selectedCategory = categories.find((c) => c.id === category);
+    const selectedCategory = CATEGORIES.find((c) => c.id === category);
 
     addSubscription({
       name: name.trim(),
@@ -64,7 +65,7 @@ export function AddSubscriptionModal() {
     { value: 'yearly', label: 'Yearly' },
   ];
 
-  const categoryOptions = categories.map((c) => ({ value: c.id, label: c.name }));
+  const categoryOptions = CATEGORIES.map((c) => ({ value: c.id, label: c.name }));
 
   return (
     <Modal isOpen={isAddModalOpen} onClose={handleClose} title="Add Subscription">

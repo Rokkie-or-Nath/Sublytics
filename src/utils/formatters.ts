@@ -20,13 +20,6 @@ export function formatRelativeDate(dateStr: string): string {
   return formatDate(dateStr);
 }
 
-export function formatNumber(num: number): string {
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}k`;
-  }
-  return num.toString();
-}
-
 export function getDaysUntil(dateStr: string): number {
   const date = new Date(dateStr);
   const now = new Date();

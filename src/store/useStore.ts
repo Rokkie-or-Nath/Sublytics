@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { Subscription, Activity, Insight, Page, Category, User } from '../types';
+import type { Subscription, Activity, Insight, Page, User } from '../types';
+import * as service from '../lib/service';
+import { DEFAULTS } from '../constants/defaults';
+
+// ─── State interface ───────────────────────────────────────────────────────
 
 interface AppState {
   // Auth
@@ -42,6 +46,10 @@ interface AppState {
   setSelectedCategory: (category: string | null) => void;
   isAddModalOpen: boolean;
   setIsAddModalOpen: (open: boolean) => void;
+  sortBy: 'name' | 'cost' | 'nextBilling' | 'status';
+  setSortBy: (sort: 'name' | 'cost' | 'nextBilling' | 'status') => void;
+  sortOrder: 'asc' | 'desc';
+  setSortOrder: (order: 'asc' | 'desc') => void;
 
   // Settings
   currency: string;
@@ -52,516 +60,190 @@ interface AppState {
   setEmailAlerts: (enabled: boolean) => void;
   weeklyReports: boolean;
   setWeeklyReports: (enabled: boolean) => void;
+  budget: number;
+  setBudget: (budget: number) => void;
 }
 
-export const categories: Category[] = [
-  { id: 'streaming', name: 'Streaming', color: '#E74C3C', icon: 'play' },
-  { id: 'productivity', name: 'Productivity', color: '#3B82F6', icon: 'briefcase' },
-  { id: 'fitness', name: 'Fitness', color: '#0FA573', icon: 'dumbbell' },
-  { id: 'music', name: 'Music', color: '#8B5CF6', icon: 'music' },
-  { id: 'cloud', name: 'Cloud Storage', color: '#06B6D4', icon: 'cloud' },
-  { id: 'gaming', name: 'Gaming', color: '#EC4899', icon: 'gamepad' },
-  { id: 'news', name: 'News', color: '#F59E0B', icon: 'newspaper' },
-  { id: 'shopping', name: 'Shopping', color: '#F43F5E', icon: 'shopping-bag' },
-  { id: 'other', name: 'Other', color: '#6B7B8F', icon: 'more-horizontal' },
-];
-
-// Generate deterministic "random" data from email string
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-}
-
-function seededRandom(seed: number): number {
-  const x = Math.sin(seed++) * 10000;
-  return x - Math.floor(x);
-}
-
-function generateEmailBasedSubscriptions(email: string): Subscription[] {
-  const seed = hashString(email.toLowerCase().trim());
-  const now = new Date();
-  const addDays = (days: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
-  };
-  const addMonths = (months: number) => {
-    const d = new Date(now);
-    d.setMonth(d.getMonth() + months);
-    return d.toISOString().split('T')[0];
-  };
-
-  const possibleSubs = [
-    { name: 'Netflix', category: 'streaming', cost: 15.49, color: '#E74C3C', desc: 'Standard plan - HD streaming' },
-    { name: 'Spotify', category: 'music', cost: 10.99, color: '#8B5CF6', desc: 'Premium individual plan' },
-    { name: 'Apple Music', category: 'music', cost: 10.99, color: '#F43F5E', desc: 'Individual plan' },
-    { name: 'Notion', category: 'productivity', cost: 8.00, color: '#3B82F6', desc: 'Personal Pro plan' },
-    { name: 'Apple Fitness+', category: 'fitness', cost: 9.99, color: '#0FA573', desc: 'Monthly fitness subscription' },
-    { name: 'Peloton', category: 'fitness', cost: 44.00, color: '#E74C3C', desc: 'All-Access Membership' },
-    { name: 'iCloud+', category: 'cloud', cost: 2.99, color: '#06B6D4', desc: '200GB storage plan' },
-    { name: 'Google One', category: 'cloud', cost: 9.99, color: '#3B82F6', desc: '2TB storage plan' },
-    { name: 'Xbox Game Pass', category: 'gaming', cost: 16.99, color: '#EC4899', desc: 'Ultimate subscription' },
-    { name: 'PlayStation Plus', category: 'gaming', cost: 14.99, color: '#3B82F6', desc: 'Extra tier' },
-    { name: 'The New York Times', category: 'news', cost: 17.00, color: '#F59E0B', desc: 'Digital subscription' },
-    { name: 'Washington Post', category: 'news', cost: 12.00, color: '#06B6D4', desc: 'Digital access' },
-    { name: 'Adobe Creative Cloud', category: 'productivity', cost: 54.99, color: '#E67E3C', desc: 'All Apps plan' },
-    { name: 'Figma', category: 'productivity', cost: 12.00, color: '#EC4899', desc: 'Professional plan' },
-    { name: 'Dropbox', category: 'cloud', cost: 11.99, color: '#3B82F6', desc: 'Plus plan - 2TB' },
-    { name: 'YouTube Premium', category: 'streaming', cost: 13.99, color: '#E74C3C', desc: 'Individual plan' },
-    { name: 'Hulu', category: 'streaming', cost: 14.99, color: '#14B8A6', desc: 'No Ads plan' },
-    { name: 'Disney+', category: 'streaming', cost: 13.99, color: '#3B82F6', desc: 'Premium with Hulu' },
-    { name: 'Amazon Prime', category: 'shopping', cost: 14.99, color: '#F59E0B', desc: 'Monthly membership' },
-    { name: 'DoorDash DashPass', category: 'shopping', cost: 9.99, color: '#E74C3C', desc: 'Monthly delivery pass' },
-    { name: 'Calm', category: 'fitness', cost: 14.99, color: '#8B5CF6', desc: 'Premium meditation' },
-    { name: 'Headspace', category: 'fitness', cost: 12.99, color: '#F59E0B', desc: 'Meditation app' },
-    { name: 'LinkedIn Premium', category: 'productivity', cost: 29.99, color: '#3B82F6', desc: 'Career subscription' },
-    { name: 'GitHub Copilot', category: 'productivity', cost: 10.00, color: '#6B7B8F', desc: 'AI coding assistant' },
-    { name: 'ChatGPT Plus', category: 'productivity', cost: 20.00, color: '#10A37F', desc: 'GPT-4 access' },
-    { name: 'Midjourney', category: 'productivity', cost: 10.00, color: '#8B5CF6', desc: 'AI image generation' },
-    { name: 'Audible', category: 'music', cost: 14.95, color: '#F59E0B', desc: 'Monthly audiobook credit' },
-    { name: 'Kindle Unlimited', category: 'music', cost: 11.99, color: '#3B82F6', desc: 'E-book subscription' },
-    { name: 'Paramount+', category: 'streaming', cost: 11.99, color: '#3B82F6', desc: 'Essential plan' },
-    { name: 'Max', category: 'streaming', cost: 15.99, color: '#8B5CF6', desc: 'Ad-Free plan' },
-  ];
-
-  // Select 6-14 subscriptions based on email hash
-  const count = 6 + Math.floor(seededRandom(seed) * 9);
-  const selected: Subscription[] = [];
-  const usedIndices = new Set<number>();
-
-  for (let i = 0; i < count; i++) {
-    let idx = Math.floor(seededRandom(seed + i * 100) * possibleSubs.length);
-    while (usedIndices.has(idx)) {
-      idx = (idx + 1) % possibleSubs.length;
-    }
-    usedIndices.add(idx);
-    const sub = possibleSubs[idx];
-    const cycles: Array<'monthly' | 'yearly' | 'weekly' | 'quarterly'> = ['monthly', 'monthly', 'monthly', 'yearly', 'monthly'];
-    const cycle = cycles[Math.floor(seededRandom(seed + i * 200) * cycles.length)];
-    const statusRoll = seededRandom(seed + i * 300);
-    const status: Subscription['status'] = statusRoll > 0.85 ? 'cancelled' : statusRoll > 0.7 ? 'paused' : 'active';
-    const daysOffset = Math.floor(seededRandom(seed + i * 400) * 30) - 5;
-
-    selected.push({
-      id: `sub-${i}`,
-      name: sub.name,
-      category: sub.category,
-      cost: sub.cost,
-      billingCycle: cycle,
-      nextBillingDate: addDays(daysOffset),
-      status,
-      color: sub.color,
-      description: sub.desc,
-      createdAt: addMonths(-Math.floor(seededRandom(seed + i * 500) * 12) - 1),
-    });
-  }
-
-  return selected;
-}
-
-function generateEmailBasedActivities(email: string, subs: Subscription[]): Activity[] {
-  const seed = hashString(email.toLowerCase().trim());
-  const activities: Activity[] = [];
-
-  const types: Array<Activity['type']> = ['added', 'updated', 'paused', 'alert', 'saved'];
-  const messages: Record<string, string[]> = {
-    added: ['Added {name} subscription', 'Signed up for {name}', 'Started {name} trial'],
-    updated: ['Updated {name} plan', 'Changed {name} billing cycle', 'Upgraded {name}'],
-    paused: ['Paused {name} temporarily', 'Put {name} on hold', 'Suspended {name}'],
-    alert: ['{name} billing in {days} days', '{name} price increase detected', '{name} renewal upcoming'],
-    saved: ['Found savings on {name}', 'Detected unused {name} subscription', 'Paused {name} to save money'],
-  };
-
-  for (let i = 0; i < 8; i++) {
-    const sub = subs[Math.floor(seededRandom(seed + i * 1000) * subs.length)];
-    if (!sub) continue;
-    const type = types[Math.floor(seededRandom(seed + i * 2000) * types.length)];
-    const msgs = messages[type];
-    const msg = msgs[Math.floor(seededRandom(seed + i * 3000) * msgs.length)]
-      .replace('{name}', sub.name)
-      .replace('{days}', String(Math.floor(seededRandom(seed + i * 4000) * 7) + 1));
-
-    const date = new Date();
-    date.setDate(date.getDate() - Math.floor(seededRandom(seed + i * 5000) * 30));
-
-    activities.push({
-      id: `act-${i}`,
-      type,
-      description: msg,
-      date: date.toISOString(),
-      amount: type === 'saved' ? Math.round(seededRandom(seed + i * 6000) * 100) : sub.cost,
-      subscriptionName: sub.name,
-    });
-  }
-
-  return activities;
-}
-
-function generateEmailBasedInsights(email: string, subs: Subscription[]): Insight[] {
-  const seed = hashString(email.toLowerCase().trim());
-  const insights: Insight[] = [];
-
-  const pausedOrCancelled = subs.filter((s) => s.status !== 'active');
-  const totalMonthly = subs.filter((s) => s.status === 'active').reduce((sum, s) => {
-    const monthly = s.billingCycle === 'yearly' ? s.cost / 12 : s.billingCycle === 'quarterly' ? s.cost / 3 : s.billingCycle === 'weekly' ? s.cost * 4.33 : s.cost;
-    return sum + monthly;
-  }, 0);
-
-  insights.push({
-    id: 'ins-1',
-    type: 'trend',
-    title: `Spending ${seededRandom(seed) > 0.5 ? 'up' : 'down'} ${Math.floor(seededRandom(seed + 1) * 20)}% this month`,
-    description: `Your subscription spending has ${seededRandom(seed) > 0.5 ? 'increased' : 'decreased'} compared to last month. Review your active subscriptions to understand the change.`,
-    actionable: false,
-  });
-
-  if (pausedOrCancelled.length > 0) {
-    const saved = pausedOrCancelled.reduce((sum, s) => {
-      const yearly = s.billingCycle === 'monthly' ? s.cost * 12 : s.billingCycle === 'weekly' ? s.cost * 52 : s.billingCycle === 'quarterly' ? s.cost * 4 : s.cost;
-      return sum + yearly;
-    }, 0);
-    insights.push({
-      id: 'ins-2',
-      type: 'saving',
-      title: `${pausedOrCancelled.length} subscription${pausedOrCancelled.length > 1 ? 's' : ''} managed`,
-      description: `You've paused or cancelled ${pausedOrCancelled.length} subscription${pausedOrCancelled.length > 1 ? 's' : ''}, saving approximately ${Math.round(saved)} per year.`,
-      amount: Math.round(saved),
-      actionable: true,
-    });
-  }
-
-  insights.push({
-    id: 'ins-3',
-    type: 'alert',
-    title: 'Price increase detected',
-    description: 'One of your streaming services has increased pricing. Review your subscriptions to see the impact on your budget.',
-    actionable: true,
-  });
-
-  insights.push({
-    id: 'ins-4',
-    type: 'tip',
-    title: `Switch to annual billing to save ~$${Math.floor(totalMonthly * 12 * 0.15)}`,
-    description: 'Annual billing typically offers 15-20% savings compared to monthly plans across most services.',
-    amount: Math.floor(totalMonthly * 12 * 0.15),
-    actionable: true,
-  });
-
-  return insights;
-}
-
-const now = new Date();
-const addDays = (days: number) => {
-  const d = new Date(now);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-};
-
-const defaultSubscriptions: Subscription[] = [
-  {
-    id: '1',
-    name: 'Netflix',
-    category: 'streaming',
-    cost: 15.49,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(5),
-    status: 'active',
-    color: '#E74C3C',
-    description: 'Standard plan - HD streaming',
-    createdAt: '2024-01-15',
-  },
-  {
-    id: '2',
-    name: 'Spotify',
-    category: 'music',
-    cost: 10.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(12),
-    status: 'active',
-    color: '#8B5CF6',
-    description: 'Premium individual plan',
-    createdAt: '2024-02-01',
-  },
-  {
-    id: '3',
-    name: 'Notion',
-    category: 'productivity',
-    cost: 8.00,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(18),
-    status: 'active',
-    color: '#3B82F6',
-    description: 'Personal Pro plan',
-    createdAt: '2024-03-10',
-  },
-  {
-    id: '4',
-    name: 'Apple Fitness+',
-    category: 'fitness',
-    cost: 9.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(22),
-    status: 'active',
-    color: '#0FA573',
-    description: 'Monthly fitness subscription',
-    createdAt: '2024-04-05',
-  },
-  {
-    id: '5',
-    name: 'iCloud+',
-    category: 'cloud',
-    cost: 2.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(8),
-    status: 'active',
-    color: '#06B6D4',
-    description: '200GB storage plan',
-    createdAt: '2024-01-20',
-  },
-  {
-    id: '6',
-    name: 'Xbox Game Pass',
-    category: 'gaming',
-    cost: 16.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(28),
-    status: 'active',
-    color: '#EC4899',
-    description: 'Ultimate subscription',
-    createdAt: '2024-05-01',
-  },
-  {
-    id: '7',
-    name: 'The New York Times',
-    category: 'news',
-    cost: 17.00,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(14),
-    status: 'paused',
-    color: '#F59E0B',
-    description: 'Digital subscription',
-    createdAt: '2024-06-15',
-  },
-  {
-    id: '8',
-    name: 'Adobe Creative Cloud',
-    category: 'productivity',
-    cost: 54.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(3),
-    status: 'active',
-    color: '#E67E3C',
-    description: 'All Apps plan',
-    createdAt: '2024-02-20',
-  },
-  {
-    id: '9',
-    name: 'Dropbox',
-    category: 'cloud',
-    cost: 11.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(19),
-    status: 'active',
-    color: '#3B82F6',
-    description: 'Plus plan - 2TB',
-    createdAt: '2024-03-25',
-  },
-  {
-    id: '10',
-    name: 'Peloton',
-    category: 'fitness',
-    cost: 44.00,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(25),
-    status: 'cancelled',
-    color: '#E74C3C',
-    description: 'All-Access Membership',
-    createdAt: '2024-07-01',
-  },
-  {
-    id: '11',
-    name: 'YouTube Premium',
-    category: 'streaming',
-    cost: 13.99,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(10),
-    status: 'active',
-    color: '#E74C3C',
-    description: 'Individual plan',
-    createdAt: '2024-04-15',
-  },
-  {
-    id: '12',
-    name: 'Figma',
-    category: 'productivity',
-    cost: 12.00,
-    billingCycle: 'monthly',
-    nextBillingDate: addDays(16),
-    status: 'active',
-    color: '#EC4899',
-    description: 'Professional plan',
-    createdAt: '2024-05-20',
-  },
-];
-
-const defaultActivities: Activity[] = [
-  { id: '1', type: 'alert', description: 'Netflix billing in 5 days', date: new Date().toISOString(), subscriptionName: 'Netflix' },
-  { id: '2', type: 'saved', description: 'Paused NYT subscription', date: new Date(Date.now() - 86400000 * 2).toISOString(), amount: 17.00, subscriptionName: 'The New York Times' },
-  { id: '3', type: 'added', description: 'Added Figma subscription', date: new Date(Date.now() - 86400000 * 5).toISOString(), amount: 12.00, subscriptionName: 'Figma' },
-  { id: '4', type: 'alert', description: 'Adobe Creative Cloud price increased', date: new Date(Date.now() - 86400000 * 7).toISOString(), subscriptionName: 'Adobe Creative Cloud' },
-  { id: '5', type: 'cancelled', description: 'Cancelled Peloton membership', date: new Date(Date.now() - 86400000 * 10).toISOString(), amount: 44.00, subscriptionName: 'Peloton' },
-  { id: '6', type: 'updated', description: 'Updated iCloud storage plan', date: new Date(Date.now() - 86400000 * 14).toISOString(), subscriptionName: 'iCloud+' },
-];
-
-const defaultInsights: Insight[] = [
-  {
-    id: '1',
-    type: 'saving',
-    title: 'Unused subscription detected',
-    description: 'You haven\'t used Peloton in 3 months. Consider cancelling to save $528/year.',
-    amount: 528,
-    actionable: true,
-  },
-  {
-    id: '2',
-    type: 'alert',
-    title: 'Price increase incoming',
-    description: 'Adobe Creative Cloud will increase by $5/month starting next billing cycle.',
-    amount: 60,
-    actionable: true,
-  },
-  {
-    id: '3',
-    type: 'trend',
-    title: 'Spending up 12% this month',
-    description: 'Your subscription spending increased compared to last month. Review your active subscriptions.',
-    actionable: false,
-  },
-  {
-    id: '4',
-    type: 'tip',
-    title: 'Annual billing could save you $89',
-    description: 'Switch Netflix, Spotify, and Notion to annual billing for significant savings.',
-    amount: 89,
-    actionable: true,
-  },
-];
+// ─── Store ─────────────────────────────────────────────────────────────────
 
 export const useStore = create<AppState>((set, get) => ({
-  // Auth
-  user: null,
-  isAuthenticated: false,
+  // ─── Auth ─────────────────────────────────────────────────────────────────
+  user: service.getUser(),
+  isAuthenticated: service.getUser() !== null,
   isDetecting: false,
   detectionProgress: 0,
   detectionMessage: '',
-  login: (email: string) => {
-    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    const newSubs = generateEmailBasedSubscriptions(email);
-    const newActs = generateEmailBasedActivities(email, newSubs);
-    const newInsights = generateEmailBasedInsights(email, newSubs);
 
+  login: (email: string) => {
+    const data = service.login(email);
     set({
-      user: { email, name, joinedAt: new Date().toISOString() },
+      user: data.user,
       isAuthenticated: true,
-      subscriptions: newSubs,
-      activities: newActs,
-      insights: newInsights,
+      subscriptions: data.subscriptions,
+      activities: data.activities,
+      insights: data.insights,
     });
   },
+
   logout: () => {
+    service.logout();
     set({
       user: null,
       isAuthenticated: false,
-      subscriptions: defaultSubscriptions,
-      activities: defaultActivities,
-      insights: defaultInsights,
+      subscriptions: [],
+      activities: [],
+      insights: [],
       currentPage: 'dashboard',
       searchQuery: '',
       selectedCategory: null,
     });
   },
+
   setIsDetecting: (detecting) => set({ isDetecting: detecting }),
   setDetectionProgress: (progress) => set({ detectionProgress: progress }),
   setDetectionMessage: (message) => set({ detectionMessage: message }),
 
-  // Navigation
+  // ─── Navigation ───────────────────────────────────────────────────────────
   currentPage: 'dashboard',
   setCurrentPage: (page) => set({ currentPage: page }),
 
-  // Subscriptions
-  subscriptions: defaultSubscriptions,
+  // ─── Subscriptions ────────────────────────────────────────────────────────
+  subscriptions: service.getSubscriptions(),
+
   addSubscription: (sub) => {
-    const newSub = { ...sub, id: crypto.randomUUID(), createdAt: new Date().toISOString().split('T')[0] };
+    const newSub = service.addSubscription(sub);
     set((state) => ({
-      subscriptions: [...state.subscriptions, newSub],
+      subscriptions: [newSub, ...state.subscriptions],
       activities: [
-        { id: crypto.randomUUID(), type: 'added', description: `Added ${sub.name} subscription`, date: new Date().toISOString(), amount: sub.cost, subscriptionName: sub.name },
+        {
+          id: crypto.randomUUID(),
+          type: 'added',
+          description: `Added ${sub.name} subscription`,
+          date: new Date().toISOString(),
+          amount: sub.cost,
+          subscriptionName: sub.name,
+        },
         ...state.activities,
       ],
     }));
   },
+
   updateSubscription: (id, updates) => {
+    service.updateSubscription(id, updates);
     set((state) => ({
       subscriptions: state.subscriptions.map((s) => (s.id === id ? { ...s, ...updates } : s)),
       activities: [
-        { id: crypto.randomUUID(), type: 'updated', description: `Updated ${updates.name || 'subscription'}`, date: new Date().toISOString(), subscriptionName: updates.name },
+        {
+          id: crypto.randomUUID(),
+          type: 'updated',
+          description: `Updated ${updates.name || 'subscription'}`,
+          date: new Date().toISOString(),
+          subscriptionName: updates.name,
+        },
         ...state.activities,
       ],
     }));
   },
+
   deleteSubscription: (id) => {
-    const sub = get().subscriptions.find((s) => s.id === id);
+    const sub = service.deleteSubscription(id);
+    if (!sub) return;
     set((state) => ({
       subscriptions: state.subscriptions.filter((s) => s.id !== id),
       activities: [
-        { id: crypto.randomUUID(), type: 'cancelled', description: `Removed ${sub?.name || 'subscription'}`, date: new Date().toISOString(), amount: sub?.cost, subscriptionName: sub?.name },
+        {
+          id: crypto.randomUUID(),
+          type: 'cancelled',
+          description: `Removed ${sub.name || 'subscription'}`,
+          date: new Date().toISOString(),
+          amount: sub.cost,
+          subscriptionName: sub.name,
+        },
         ...state.activities,
       ],
     }));
   },
+
   toggleSubscriptionStatus: (id) => {
-    const sub = get().subscriptions.find((s) => s.id === id);
-    if (!sub) return;
-    const newStatus = sub.status === 'active' ? 'paused' : 'active';
+    const updated = service.toggleSubscriptionStatus(id);
+    if (!updated) return;
     set((state) => ({
-      subscriptions: state.subscriptions.map((s) => (s.id === id ? { ...s, status: newStatus } : s)),
+      subscriptions: state.subscriptions.map((s) => (s.id === id ? updated : s)),
       activities: [
-        { id: crypto.randomUUID(), type: newStatus === 'paused' ? 'paused' : 'updated', description: `${newStatus === 'paused' ? 'Paused' : 'Resumed'} ${sub.name}`, date: new Date().toISOString(), amount: sub.cost, subscriptionName: sub.name },
+        {
+          id: crypto.randomUUID(),
+          type: updated.status === 'paused' ? 'paused' : 'updated',
+          description: `${updated.status === 'paused' ? 'Paused' : 'Resumed'} ${updated.name}`,
+          date: new Date().toISOString(),
+          amount: updated.cost,
+          subscriptionName: updated.name,
+        },
         ...state.activities,
       ],
     }));
   },
-  setSubscriptions: (subs) => set({ subscriptions: subs }),
 
-  // Activities
-  activities: defaultActivities,
-  addActivity: (activity) => set((state) => ({ activities: [{ ...activity, id: crypto.randomUUID() }, ...state.activities] })),
-  setActivities: (acts) => set({ activities: acts }),
+  setSubscriptions: (subs) => {
+    set({ subscriptions: subs });
+  },
 
-  // Insights
-  insights: defaultInsights,
-  setInsights: (insights) => set({ insights }),
+  // ─── Activities ───────────────────────────────────────────────────────────
+  activities: service.getActivities(),
 
-  // UI
+  addActivity: (activity) => {
+    const newAct = service.addActivity(activity);
+    set((state) => ({ activities: [newAct, ...state.activities] }));
+  },
+
+  setActivities: (acts) => {
+    service.setActivities(acts);
+    set({ activities: acts });
+  },
+
+  // ─── Insights ─────────────────────────────────────────────────────────────
+  insights: service.getInsights(),
+
+  setInsights: (insights) => {
+    service.setInsights(insights);
+    set({ insights });
+  },
+
+  // ─── UI ───────────────────────────────────────────────────────────────────
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
   selectedCategory: null,
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   isAddModalOpen: false,
   setIsAddModalOpen: (open) => set({ isAddModalOpen: open }),
+  sortBy: 'name',
+  setSortBy: (sort) => set({ sortBy: sort }),
+  sortOrder: 'asc',
+  setSortOrder: (order) => set({ sortOrder: order }),
 
-  // Settings
-  currency: '$',
-  setCurrency: (currency) => set({ currency }),
-  notifications: true,
-  setNotifications: (enabled) => set({ notifications: enabled }),
-  emailAlerts: true,
-  setEmailAlerts: (enabled) => set({ emailAlerts: enabled }),
-  weeklyReports: false,
-  setWeeklyReports: (enabled) => set({ weeklyReports: enabled }),
+  // ─── Settings ─────────────────────────────────────────────────────────────
+  currency: service.getCurrency(),
+  setCurrency: (currency) => {
+    service.setCurrency(currency);
+    set({ currency });
+  },
+  notifications: service.getNotifications(),
+  setNotifications: (enabled) => {
+    service.setNotifications(enabled);
+    set({ notifications: enabled });
+  },
+  emailAlerts: service.getEmailAlerts(),
+  setEmailAlerts: (enabled) => {
+    service.setEmailAlerts(enabled);
+    set({ emailAlerts: enabled });
+  },
+  weeklyReports: service.getWeeklyReports(),
+  setWeeklyReports: (enabled) => {
+    service.setWeeklyReports(enabled);
+    set({ weeklyReports: enabled });
+  },
+  budget: service.getBudget(),
+  setBudget: (budget) => {
+    service.setBudget(budget);
+    set({ budget });
+  },
 }));

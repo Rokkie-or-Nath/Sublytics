@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { getMonthlyCost, formatCurrency } from '../../utils/formatters';
 
 export function WelcomeBanner() {
-  const { subscriptions, currency, setCurrentPage } = useStore();
+  const { subscriptions, currency, setCurrentPage, user, budget } = useStore();
   const activeSubs = subscriptions.filter((s) => s.status === 'active');
   const monthlyTotal = activeSubs.reduce((sum, s) => sum + getMonthlyCost(s.cost, s.billingCycle), 0);
 
@@ -29,7 +29,7 @@ export function WelcomeBanner() {
             <span className="text-xs font-medium text-accent-bright uppercase tracking-wider">Overview</span>
           </div>
           <h1 className="text-2xl lg:text-3xl font-bold text-text-primary">
-            {greeting}, John
+            {greeting}, {user?.name?.trim() ? user.name.split(' ')[0] : 'there'}
           </h1>
           <p className="text-sm text-text-secondary mt-1 max-w-lg">
             You have <span className="text-accent font-semibold">{activeSubs.length} active subscriptions</span> costing{' '}
@@ -61,14 +61,14 @@ export function WelcomeBanner() {
       <div className="relative z-10 mt-6">
         <div className="flex items-center justify-between text-xs text-text-muted mb-2">
           <span>Budget usage</span>
-          <span>{Math.min(Math.round((monthlyTotal / 300) * 100), 100)}% of $300 budget</span>
+          <span>{Math.min(Math.round((monthlyTotal / budget) * 100), 100)}% of {formatCurrency(budget, currency)} budget</span>
         </div>
         <div className="h-2 bg-bg-deep rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${Math.min((monthlyTotal / 300) * 100, 100)}%` }}
+            animate={{ width: `${Math.min((monthlyTotal / budget) * 100, 100)}%` }}
             transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-            className={`h-full rounded-full ${monthlyTotal > 250 ? 'bg-alert' : monthlyTotal > 200 ? 'bg-amber' : 'bg-accent'}`}
+            className={`h-full rounded-full ${monthlyTotal > budget * 0.83 ? 'bg-alert' : monthlyTotal > budget * 0.67 ? 'bg-amber' : 'bg-accent'}`}
           />
         </div>
       </div>
