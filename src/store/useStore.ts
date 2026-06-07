@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Subscription, Activity, Insight, Page, User } from '../types';
 import * as service from '../lib/service';
+import * as accounts from '../lib/accounts';
 import { DEFAULTS } from '../constants/defaults';
 
 // ─── State interface ───────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ interface AppState {
   detectionMessage: string;
   initAuth: () => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: true } | { success: false; error: string }>;
   setIsDetecting: (detecting: boolean) => void;
   setDetectionProgress: (progress: number) => void;
   setDetectionMessage: (message: string) => void;
@@ -111,6 +113,28 @@ export const useStore = create<AppState>((set) => ({
       searchQuery: '',
       selectedCategory: null,
     });
+  },
+
+  deleteAccount: async () => {
+    // Call the Edge Function (uses service_role key server-side) to delete
+    // the auth user. FK cascades wipe their profile + data automatically.
+    const result = await accounts.deleteAccount();
+    if (!result.success) return result;
+
+    // Edge function succeeded — sign out locally and reset state.
+    await service.logout();
+    set({
+      user: null,
+      isAuthenticated: false,
+      isInitializing: false,
+      subscriptions: [],
+      activities: [],
+      insights: [],
+      currentPage: 'dashboard',
+      searchQuery: '',
+      selectedCategory: null,
+    });
+    return { success: true };
   },
 
   setIsDetecting: (detecting) => set({ isDetecting: detecting }),

@@ -15,6 +15,7 @@ export function SettingsPage() {
   const {
     user,
     logout,
+    deleteAccount,
     currency, setCurrency,
     notifications, setNotifications,
     emailAlerts, setEmailAlerts,
@@ -24,6 +25,8 @@ export function SettingsPage() {
   } = useStore();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [budgetInput, setBudgetInput] = useState(String(budget));
 
   const formatDate = (dateStr: string) => {
@@ -69,8 +72,13 @@ export function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    await logoutAccount();
-    logout();
+    setDeleting(true);
+    setDeleteError('');
+    const result = await deleteAccount();
+    setDeleting(false);
+    if (!result.success) {
+      setDeleteError(result.error);
+    }
   };
 
   const handleExport = () => {
@@ -291,15 +299,18 @@ export function SettingsPage() {
       <ConfirmDialog
         isOpen={deleteDialogOpen}
         title="Delete Account?"
-        message="This will permanently delete all your subscription data, activity history, and settings. This action cannot be undone."
+        message="This will permanently delete your account, all subscription data, activity history, and settings. This action cannot be undone."
         confirmLabel="Delete my account"
         cancelLabel="Keep my account"
         variant="danger"
-        onConfirm={() => {
+        isLoading={deleting}
+        error={deleteError}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => {
+          if (deleting) return;
           setDeleteDialogOpen(false);
-          handleDeleteAccount();
+          setDeleteError('');
         }}
-        onCancel={() => setDeleteDialogOpen(false)}
       />
     </div>
   );
