@@ -11,9 +11,6 @@ import {
   generateEmailBasedSubscriptions,
   generateActivities,
   generateInsights,
-  defaultSubscriptions,
-  defaultActivities,
-  defaultInsights,
 } from './mock-data';
 import type { Subscription, Activity, Insight, User } from '../types';
 import { DEFAULTS } from '../constants/defaults';
@@ -25,9 +22,18 @@ import { DEFAULTS } from '../constants/defaults';
  * Does NOT touch the database — used as a cheap check on app boot.
  */
 export async function getSessionUser(): Promise<User | null> {
-  const { data } = await supabase.auth.getSession();
+  console.log('[Sublytics] getSessionUser: reading session…');
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.warn('[Sublytics] getSession error:', error.message);
+    return null;
+  }
   const u = data.session?.user;
-  if (!u) return null;
+  if (!u) {
+    console.log('[Sublytics] no active session');
+    return null;
+  }
+  console.log('[Sublytics] active session for', u.email);
   return {
     email: u.email ?? '',
     name: (u.user_metadata?.name as string) || (u.email?.split('@')[0] ?? 'User'),
@@ -47,18 +53,27 @@ export async function loadUserData(): Promise<{
   activities: Activity[];
   insights: Insight[];
 } | null> {
+  console.log('[Sublytics] loadUserData: start');
   const sessionUser = await getSessionUser();
-  if (!sessionUser) return null;
+  if (!sessionUser) {
+    console.log('[Sublytics] loadUserData: no session, returning null');
+    return null;
+  }
 
-  // Ensure the profile row exists (the DB trigger does this on signup, but we
-  // also handle the case where the trigger is missing or a user was created
-  // before the trigger was installed).
-  const { data: authUser } = await supabase.auth.getUser();
-  if (!authUser.user) return null;
+  // Resolve the auth user so we have their UUID.
+  console.log('[Sublytics] loadUserData: calling auth.getUser…');
+  const { data: authUser, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !authUser.user) {
+    console.warn('[Sublytics] getUser error:', authErr?.message);
+    return null;
+  }
+  console.log('[Sublytics] auth user:', authUser.user.id);
 
+  // Profile
+  console.log('[Sublytics] loadUserData: fetching profile…');
   let profile = await db.getProfile();
   if (!profile) {
-    // Create the row explicitly as a fallback.
+    console.log('[Sublytics] no profile row yet, creating…');
     await supabase.from('profiles').upsert({
       id: authUser.user.id,
       email: authUser.user.email ?? sessionUser.email,
@@ -67,32 +82,44 @@ export async function loadUserData(): Promise<{
     }, { onConflict: 'id' });
     profile = await db.getProfile();
   }
-  if (!profile) return null;
+  if (!profile) {
+    console.warn('[Sublytics] still no profile after upsert');
+    return null;
+  }
+  console.log('[Sublytics] profile loaded:', profile.email);
 
-  // Seed each table if it's empty for this user.
+  // Subscriptions
+  console.log('[Sublytics] loadUserData: fetching subscriptions…');
   const existingSubs = await db.getSubscriptions();
   let subscriptions = existingSubs;
   if (subscriptions.length === 0) {
-    // Use deterministic per-user data so it looks like an "email scan" result.
+    console.log('[Sublytics] no subs yet, seeding…');
     const seed = storage.get<Subscription[] | null>('seed_subs', null)
       ?? generateEmailBasedSubscriptions(sessionUser.email);
     await db.seedSubscriptionsIfEmpty(seed);
     subscriptions = await db.getSubscriptions();
   }
+  console.log('[Sublytics] subscriptions loaded:', subscriptions.length);
 
+  // Activities
+  console.log('[Sublytics] loadUserData: fetching activities…');
   let activities = await db.getActivities();
   if (activities.length === 0) {
     const seedActs = generateActivities(sessionUser.email, subscriptions);
     await db.seedActivitiesIfEmpty(seedActs);
     activities = await db.getActivities();
   }
+  console.log('[Sublytics] activities loaded:', activities.length);
 
+  // Insights
+  console.log('[Sublytics] loadUserData: fetching insights…');
   let insights = await db.getInsights();
   if (insights.length === 0) {
     const seedInsights = generateInsights(sessionUser.email, subscriptions);
     await db.seedInsightsIfEmpty(seedInsights);
     insights = await db.getInsights();
   }
+  console.log('[Sublytics] insights loaded:', insights.length);
 
   return {
     user: {
@@ -167,6 +194,3 @@ export async function getWeeklyReports(): Promise<boolean> {
 }
 export const setWeeklyReports = (enabled: boolean) =>
   db.upsertProfileSettings({ weeklyReports: enabled });
-
-// ─── Re-exports for local one-time migration ────────────────────────────────
-export { defaultSubscriptions, defaultActivities, defaultInsights };

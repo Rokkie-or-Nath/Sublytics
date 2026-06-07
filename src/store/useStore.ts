@@ -2,7 +2,24 @@ import { create } from 'zustand';
 import type { Subscription, Activity, Insight, Page, User } from '../types';
 import * as service from '../lib/service';
 import * as accounts from '../lib/accounts';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { DEFAULTS } from '../constants/defaults';
+
+/**
+ * Wraps a promise with a timeout so the load screen doesn't hang forever
+ * if Supabase is unreachable or a request never settles.
+ * Throws the timeout reason after `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Request timed out after ${ms}ms (${label})`));
+    }, ms);
+    promise
+      .then((v) => { clearTimeout(timer); resolve(v); })
+      .catch((e) => { clearTimeout(timer); reject(e); });
+  });
+}
 
 // ─── State interface ───────────────────────────────────────────────────────
 
@@ -11,6 +28,7 @@ interface AppState {
   user: User | null;
   isAuthenticated: boolean;
   isInitializing: boolean;          // true on first session check
+  initError: string;                // set when initAuth fails (e.g. bad .env)
   isDetecting: boolean;             // true during the "email scan" animation
   detectionProgress: number;
   detectionMessage: string;
@@ -69,35 +87,70 @@ interface AppState {
 
 // ─── Store ─────────────────────────────────────────────────────────────────
 
+const SUPABASE_NOT_CONFIGURED_MSG =
+  'Supabase is not configured. Open .env and set VITE_SUPABASE_URL and ' +
+  'VITE_SUPABASE_ANON_KEY to your project values, then restart the dev server. ' +
+  'See .env.example for the format.';
+
 export const useStore = create<AppState>((set) => ({
   // ─── Auth ─────────────────────────────────────────────────────────────────
   user: null,
   isAuthenticated: false,
   isInitializing: true,             // start as "still figuring out who you are"
+  initError: '',
   isDetecting: false,
   detectionProgress: 0,
   detectionMessage: '',
 
   initAuth: async () => {
-    set({ isInitializing: true });
-    const data = await service.loadUserData();
-    if (!data) {
-      set({ user: null, isAuthenticated: false, isInitializing: false });
+    set({ isInitializing: true, initError: '' });
+
+    // If .env still has placeholder Supabase values, bail out cleanly
+    // instead of letting the requests hang.
+    if (!isSupabaseConfigured) {
+      set({
+        user: null,
+        isAuthenticated: false,
+        isInitializing: false,
+        initError: SUPABASE_NOT_CONFIGURED_MSG,
+      });
       return;
     }
-    set({
-      user: data.user,
-      isAuthenticated: true,
-      isInitializing: false,
-      subscriptions: data.subscriptions,
-      activities: data.activities,
-      insights: data.insights,
-      currency: data.profile.currency,
-      notifications: data.profile.notifications,
-      emailAlerts: data.profile.emailAlerts,
-      weeklyReports: data.profile.weeklyReports,
-      budget: data.profile.budget,
-    });
+
+    try {
+      const LOAD_TIMEOUT_MS = 15_000; // 15 seconds max to load user data
+      const data = await withTimeout(service.loadUserData(), LOAD_TIMEOUT_MS, 'loadUserData');
+      if (!data) {
+        set({ user: null, isAuthenticated: false, isInitializing: false });
+        return;
+      }
+      set({
+        user: data.user,
+        isAuthenticated: true,
+        isInitializing: false,
+        subscriptions: data.subscriptions,
+        activities: data.activities,
+        insights: data.insights,
+        currency: data.profile.currency,
+        notifications: data.profile.notifications,
+        emailAlerts: data.profile.emailAlerts,
+        weeklyReports: data.profile.weeklyReports,
+        budget: data.profile.budget,
+      });
+    } catch (err) {
+      // ANY failure here (network, bad env, missing tables, etc.) must
+      // still flip isInitializing to false so the UI doesn't hang forever.
+      // eslint-disable-next-line no-console
+      console.error('[Sublytics] initAuth failed:', err);
+      set({
+        user: null,
+        isAuthenticated: false,
+        isInitializing: false,
+        initError:
+          (err instanceof Error ? err.message : String(err)) ||
+          'Failed to connect to Supabase. Check your .env and that the schema is applied.',
+      });
+    }
   },
 
   logout: async () => {
@@ -106,6 +159,7 @@ export const useStore = create<AppState>((set) => ({
       user: null,
       isAuthenticated: false,
       isInitializing: false,
+      initError: '',
       subscriptions: [],
       activities: [],
       insights: [],
@@ -127,6 +181,7 @@ export const useStore = create<AppState>((set) => ({
       user: null,
       isAuthenticated: false,
       isInitializing: false,
+      initError: '',
       subscriptions: [],
       activities: [],
       insights: [],

@@ -1,3 +1,7 @@
+// @ts-nocheck — this file runs on Deno, not Node. Deno globals (Deno.env,
+// Deno.serve) and the https:// imports are not visible to the project's
+// tsc. They are real and work at runtime once you `supabase functions deploy`.
+
 // ─── Supabase Edge Function: delete-account ────────────────────────────────
 // Permanently deletes the calling user. Cascades through profiles /
 // subscriptions / activities / insights via the FKs we set up in
