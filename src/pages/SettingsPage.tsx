@@ -9,6 +9,7 @@ import {
   ChevronRight, LogOut, Download, PiggyBank
 } from 'lucide-react';
 import { CURRENCIES } from '../constants/defaults';
+import { logoutAccount } from '../lib/accounts';
 
 export function SettingsPage() {
   const {
@@ -62,6 +63,16 @@ export function SettingsPage() {
     </div>
   );
 
+  const handleLogout = async () => {
+    await logoutAccount();
+    logout();
+  };
+
+  const handleDeleteAccount = async () => {
+    await logoutAccount();
+    logout();
+  };
+
   const handleExport = () => {
     const data = JSON.stringify({ subscriptions, activities, insights, user, currency, budget }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
@@ -110,7 +121,7 @@ export function SettingsPage() {
                 Member since {user?.joinedAt ? formatDate(user.joinedAt) : 'Recently'}
               </p>
             </div>
-            <Button variant="danger" size="sm" leftIcon={<LogOut className="w-3.5 h-3.5" />} onClick={logout}>
+            <Button variant="danger" size="sm" leftIcon={<LogOut className="w-3.5 h-3.5" />} onClick={handleLogout}>
               Sign out
             </Button>
           </div>
@@ -286,7 +297,7 @@ export function SettingsPage() {
         variant="danger"
         onConfirm={() => {
           setDeleteDialogOpen(false);
-          logout();
+          handleDeleteAccount();
         }}
         onCancel={() => setDeleteDialogOpen(false)}
       />

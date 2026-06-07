@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Diamond, ArrowRight, User, Eye, EyeOff } from 'lucide-react';
 import { registerAccount } from '../lib/accounts';
+import { useStore } from '../store/useStore';
 
 interface SignupPageProps {
   onSwitchToLogin: () => void;
-  onSignupSuccess: (email: string) => void;
 }
 
-export function SignupPage({ onSwitchToLogin, onSignupSuccess }: SignupPageProps) {
+export function SignupPage({ onSwitchToLogin }: SignupPageProps) {
+  const initAuth = useStore((s) => s.initAuth);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,17 +34,16 @@ export function SignupPage({ onSwitchToLogin, onSignupSuccess }: SignupPageProps
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const result = registerAccount(email, password, name);
+    const result = await registerAccount(email, password, name);
     if (!result.success) {
       setError(result.error);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(false);
-    onSignupSuccess(email);
+    // Trigger the store to load profile + data from Supabase.
+    await initAuth();
   };
 
   return (

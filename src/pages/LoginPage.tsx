@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Diamond, ArrowRight, Shield, Zap, Eye, EyeOff } from 'lucide-react';
-import { loginAccount, accountExists } from '../lib/accounts';
+import { loginAccount } from '../lib/accounts';
+import { useStore } from '../store/useStore';
 
 interface LoginPageProps {
   onSwitchToSignup: () => void;
-  onLoginSuccess: (email: string) => void;
 }
 
-export function LoginPage({ onSwitchToSignup, onLoginSuccess }: LoginPageProps) {
+export function LoginPage({ onSwitchToSignup }: LoginPageProps) {
+  const initAuth = useStore((s) => s.initAuth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,28 +31,16 @@ export function LoginPage({ onSwitchToSignup, onLoginSuccess }: LoginPageProps) 
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    // Check if this is a registered account first
-    const exists = accountExists(email);
-
-    if (!exists) {
-      // No account — redirect to signup
-      setError('No account found with this email. Please sign up first.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Try logging in
-    const result = loginAccount(email, password);
+    const result = await loginAccount(email, password);
     if (!result.success) {
       setError(result.error);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(false);
-    onLoginSuccess(email);
+    // Trigger the store to load profile + data from Supabase.
+    await initAuth();
   };
 
   return (

@@ -9,11 +9,12 @@ interface AppState {
   // Auth
   user: User | null;
   isAuthenticated: boolean;
-  isDetecting: boolean;
+  isInitializing: boolean;          // true on first session check
+  isDetecting: boolean;             // true during the "email scan" animation
   detectionProgress: number;
   detectionMessage: string;
-  login: (email: string) => void;
-  logout: () => void;
+  initAuth: () => Promise<void>;
+  logout: () => Promise<void>;
   setIsDetecting: (detecting: boolean) => void;
   setDetectionProgress: (progress: number) => void;
   setDetectionMessage: (message: string) => void;
@@ -24,15 +25,15 @@ interface AppState {
 
   // Subscriptions
   subscriptions: Subscription[];
-  addSubscription: (sub: Omit<Subscription, 'id' | 'createdAt'>) => void;
-  updateSubscription: (id: string, updates: Partial<Subscription>) => void;
-  deleteSubscription: (id: string) => void;
-  toggleSubscriptionStatus: (id: string) => void;
+  addSubscription: (sub: Omit<Subscription, 'id' | 'createdAt'>) => Promise<void>;
+  updateSubscription: (id: string, updates: Partial<Subscription>) => Promise<void>;
+  deleteSubscription: (id: string) => Promise<void>;
+  toggleSubscriptionStatus: (id: string) => Promise<void>;
   setSubscriptions: (subs: Subscription[]) => void;
 
   // Activities
   activities: Activity[];
-  addActivity: (activity: Omit<Activity, 'id'>) => void;
+  addActivity: (activity: Omit<Activity, 'id'>) => Promise<void>;
   setActivities: (acts: Activity[]) => void;
 
   // Insights
@@ -53,43 +54,56 @@ interface AppState {
 
   // Settings
   currency: string;
-  setCurrency: (currency: string) => void;
+  setCurrency: (currency: string) => Promise<void>;
   notifications: boolean;
-  setNotifications: (enabled: boolean) => void;
+  setNotifications: (enabled: boolean) => Promise<void>;
   emailAlerts: boolean;
-  setEmailAlerts: (enabled: boolean) => void;
+  setEmailAlerts: (enabled: boolean) => Promise<void>;
   weeklyReports: boolean;
-  setWeeklyReports: (enabled: boolean) => void;
+  setWeeklyReports: (enabled: boolean) => Promise<void>;
   budget: number;
-  setBudget: (budget: number) => void;
+  setBudget: (budget: number) => Promise<void>;
 }
 
 // ─── Store ─────────────────────────────────────────────────────────────────
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>((set) => ({
   // ─── Auth ─────────────────────────────────────────────────────────────────
-  user: service.getUser(),
-  isAuthenticated: service.getUser() !== null,
+  user: null,
+  isAuthenticated: false,
+  isInitializing: true,             // start as "still figuring out who you are"
   isDetecting: false,
   detectionProgress: 0,
   detectionMessage: '',
 
-  login: (email: string) => {
-    const data = service.login(email);
+  initAuth: async () => {
+    set({ isInitializing: true });
+    const data = await service.loadUserData();
+    if (!data) {
+      set({ user: null, isAuthenticated: false, isInitializing: false });
+      return;
+    }
     set({
       user: data.user,
       isAuthenticated: true,
+      isInitializing: false,
       subscriptions: data.subscriptions,
       activities: data.activities,
       insights: data.insights,
+      currency: data.profile.currency,
+      notifications: data.profile.notifications,
+      emailAlerts: data.profile.emailAlerts,
+      weeklyReports: data.profile.weeklyReports,
+      budget: data.profile.budget,
     });
   },
 
-  logout: () => {
-    service.logout();
+  logout: async () => {
+    await service.logout();
     set({
       user: null,
       isAuthenticated: false,
+      isInitializing: false,
       subscriptions: [],
       activities: [],
       insights: [],
@@ -108,105 +122,106 @@ export const useStore = create<AppState>((set, get) => ({
   setCurrentPage: (page) => set({ currentPage: page }),
 
   // ─── Subscriptions ────────────────────────────────────────────────────────
-  subscriptions: service.getSubscriptions(),
+  subscriptions: [],
 
-  addSubscription: (sub) => {
-    const newSub = service.addSubscription(sub);
-    set((state) => ({
-      subscriptions: [newSub, ...state.subscriptions],
-      activities: [
-        {
-          id: crypto.randomUUID(),
-          type: 'added',
-          description: `Added ${sub.name} subscription`,
-          date: new Date().toISOString(),
-          amount: sub.cost,
-          subscriptionName: sub.name,
-        },
-        ...state.activities,
-      ],
-    }));
+  addSubscription: async (sub) => {
+    try {
+      const newSub = await service.addSubscription(sub);
+      const newAct = await service.addActivity({
+        type: 'added',
+        description: `Added ${sub.name} subscription`,
+        date: new Date().toISOString(),
+        amount: sub.cost,
+        subscriptionName: sub.name,
+      });
+      set((state) => ({
+        subscriptions: [newSub, ...state.subscriptions],
+        activities: [newAct, ...state.activities],
+      }));
+    } catch (err) {
+      console.error('Failed to add subscription:', err);
+    }
   },
 
-  updateSubscription: (id, updates) => {
-    service.updateSubscription(id, updates);
-    set((state) => ({
-      subscriptions: state.subscriptions.map((s) => (s.id === id ? { ...s, ...updates } : s)),
-      activities: [
-        {
-          id: crypto.randomUUID(),
-          type: 'updated',
-          description: `Updated ${updates.name || 'subscription'}`,
-          date: new Date().toISOString(),
-          subscriptionName: updates.name,
-        },
-        ...state.activities,
-      ],
-    }));
+  updateSubscription: async (id, updates) => {
+    try {
+      const updated = await service.updateSubscription(id, updates);
+      if (!updated) return;
+      const newAct = await service.addActivity({
+        type: 'updated',
+        description: `Updated ${updates.name || 'subscription'}`,
+        date: new Date().toISOString(),
+        subscriptionName: updates.name,
+      });
+      set((state) => ({
+        subscriptions: state.subscriptions.map((s) => (s.id === id ? updated : s)),
+        activities: [newAct, ...state.activities],
+      }));
+    } catch (err) {
+      console.error('Failed to update subscription:', err);
+    }
   },
 
-  deleteSubscription: (id) => {
-    const sub = service.deleteSubscription(id);
-    if (!sub) return;
-    set((state) => ({
-      subscriptions: state.subscriptions.filter((s) => s.id !== id),
-      activities: [
-        {
-          id: crypto.randomUUID(),
-          type: 'cancelled',
-          description: `Removed ${sub.name || 'subscription'}`,
-          date: new Date().toISOString(),
-          amount: sub.cost,
-          subscriptionName: sub.name,
-        },
-        ...state.activities,
-      ],
-    }));
+  deleteSubscription: async (id) => {
+    try {
+      const removed = await service.deleteSubscription(id);
+      if (!removed) return;
+      const newAct = await service.addActivity({
+        type: 'cancelled',
+        description: `Removed ${removed.name || 'subscription'}`,
+        date: new Date().toISOString(),
+        amount: removed.cost,
+        subscriptionName: removed.name,
+      });
+      set((state) => ({
+        subscriptions: state.subscriptions.filter((s) => s.id !== id),
+        activities: [newAct, ...state.activities],
+      }));
+    } catch (err) {
+      console.error('Failed to delete subscription:', err);
+    }
   },
 
-  toggleSubscriptionStatus: (id) => {
-    const updated = service.toggleSubscriptionStatus(id);
-    if (!updated) return;
-    set((state) => ({
-      subscriptions: state.subscriptions.map((s) => (s.id === id ? updated : s)),
-      activities: [
-        {
-          id: crypto.randomUUID(),
-          type: updated.status === 'paused' ? 'paused' : 'updated',
-          description: `${updated.status === 'paused' ? 'Paused' : 'Resumed'} ${updated.name}`,
-          date: new Date().toISOString(),
-          amount: updated.cost,
-          subscriptionName: updated.name,
-        },
-        ...state.activities,
-      ],
-    }));
+  toggleSubscriptionStatus: async (id) => {
+    try {
+      const updated = await service.toggleSubscriptionStatus(id);
+      if (!updated) return;
+      const newAct = await service.addActivity({
+        type: updated.status === 'paused' ? 'paused' : 'updated',
+        description: `${updated.status === 'paused' ? 'Paused' : 'Resumed'} ${updated.name}`,
+        date: new Date().toISOString(),
+        amount: updated.cost,
+        subscriptionName: updated.name,
+      });
+      set((state) => ({
+        subscriptions: state.subscriptions.map((s) => (s.id === id ? updated : s)),
+        activities: [newAct, ...state.activities],
+      }));
+    } catch (err) {
+      console.error('Failed to toggle subscription status:', err);
+    }
   },
 
-  setSubscriptions: (subs) => {
-    set({ subscriptions: subs });
-  },
+  setSubscriptions: (subs) => set({ subscriptions: subs }),
 
   // ─── Activities ───────────────────────────────────────────────────────────
-  activities: service.getActivities(),
+  activities: [],
 
-  addActivity: (activity) => {
-    const newAct = service.addActivity(activity);
-    set((state) => ({ activities: [newAct, ...state.activities] }));
+  addActivity: async (activity) => {
+    try {
+      const newAct = await service.addActivity(activity);
+      set((state) => ({ activities: [newAct, ...state.activities] }));
+    } catch (err) {
+      console.error('Failed to add activity:', err);
+    }
   },
 
-  setActivities: (acts) => {
-    service.setActivities(acts);
-    set({ activities: acts });
-  },
+  setActivities: (acts) => set({ activities: acts }),
 
   // ─── Insights ─────────────────────────────────────────────────────────────
-  insights: service.getInsights(),
+  insights: [],
 
-  setInsights: (insights) => {
-    service.setInsights(insights);
-    set({ insights });
-  },
+  setInsights: (insights) => set({ insights }),
 
   // ─── UI ───────────────────────────────────────────────────────────────────
   searchQuery: '',
@@ -221,29 +236,38 @@ export const useStore = create<AppState>((set, get) => ({
   setSortOrder: (order) => set({ sortOrder: order }),
 
   // ─── Settings ─────────────────────────────────────────────────────────────
-  currency: service.getCurrency(),
-  setCurrency: (currency) => {
-    service.setCurrency(currency);
+  currency: DEFAULTS.currency,
+  setCurrency: async (currency) => {
     set({ currency });
+    try { await service.setCurrency(currency); }
+    catch (err) { console.error('Failed to persist currency:', err); }
   },
-  notifications: service.getNotifications(),
-  setNotifications: (enabled) => {
-    service.setNotifications(enabled);
+
+  notifications: DEFAULTS.notifications,
+  setNotifications: async (enabled) => {
     set({ notifications: enabled });
+    try { await service.setNotifications(enabled); }
+    catch (err) { console.error('Failed to persist notifications:', err); }
   },
-  emailAlerts: service.getEmailAlerts(),
-  setEmailAlerts: (enabled) => {
-    service.setEmailAlerts(enabled);
+
+  emailAlerts: DEFAULTS.emailAlerts,
+  setEmailAlerts: async (enabled) => {
     set({ emailAlerts: enabled });
+    try { await service.setEmailAlerts(enabled); }
+    catch (err) { console.error('Failed to persist emailAlerts:', err); }
   },
-  weeklyReports: service.getWeeklyReports(),
-  setWeeklyReports: (enabled) => {
-    service.setWeeklyReports(enabled);
+
+  weeklyReports: DEFAULTS.weeklyReports,
+  setWeeklyReports: async (enabled) => {
     set({ weeklyReports: enabled });
+    try { await service.setWeeklyReports(enabled); }
+    catch (err) { console.error('Failed to persist weeklyReports:', err); }
   },
-  budget: service.getBudget(),
-  setBudget: (budget) => {
-    service.setBudget(budget);
+
+  budget: DEFAULTS.budget,
+  setBudget: async (budget) => {
     set({ budget });
+    try { await service.setBudget(budget); }
+    catch (err) { console.error('Failed to persist budget:', err); }
   },
 }));

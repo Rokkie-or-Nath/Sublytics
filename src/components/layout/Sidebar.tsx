@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { LayoutDashboard, CreditCard, BarChart3, Settings, Diamond, LogOut } from 'lucide-react';
 import type { Page } from '../../types';
 import { getMonthlyCost, formatCurrency } from '../../utils/formatters';
+import { logoutAccount } from '../../lib/accounts';
 
 const navItems: { page: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,6 +16,11 @@ export function Sidebar() {
   const { currentPage, setCurrentPage, subscriptions, currency, user, logout } = useStore();
   const activeSubs = subscriptions.filter((s) => s.status === 'active');
   const monthlyTotal = activeSubs.reduce((sum, s) => sum + getMonthlyCost(s.cost, s.billingCycle), 0);
+
+  const handleLogout = async () => {
+    await logoutAccount();
+    logout();
+  };
 
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 border-r border-border bg-bg-deep/95 backdrop-blur-xl z-40">
@@ -75,9 +81,7 @@ export function Sidebar() {
               <p className="text-[11px] text-text-muted truncate">{user.email}</p>
             </div>
             <button
-              onClick={logout}
-              className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-              title="Sign out"
+              onClick={handleLogout}
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>

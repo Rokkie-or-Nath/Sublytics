@@ -1,8 +1,11 @@
 /**
- * Service layer — the single source of truth for data operations.
- * Currently uses localStorage + mock data. Swap implementations here
- * without touching any component.
+ * Service layer — orchestrates Supabase reads/writes (via `db.ts`) and seeds
+ * mock data for new users. All state-mutating functions are async because they
+ * hit the network; the store handles loading states.
  */
+
+import * as db from './db';
+import { supabase } from './supabase';
 import { storage } from './storage';
 import {
   generateEmailBasedSubscriptions,
@@ -12,161 +15,158 @@ import {
   defaultActivities,
   defaultInsights,
 } from './mock-data';
-import { getAccount } from './accounts';
 import type { Subscription, Activity, Insight, User } from '../types';
 import { DEFAULTS } from '../constants/defaults';
 
-// ─── Key constants ─────────────────────────────────────────────────────────
+// ─── Auth / session lifecycle ───────────────────────────────────────────────
 
-const KEYS = {
-  user: 'user',
-  subscriptions: 'subscriptions',
-  activities: 'activities',
-  insights: 'insights',
-  currency: 'currency',
-  notifications: 'notifications',
-  emailAlerts: 'emailAlerts',
-  weeklyReports: 'weeklyReports',
-  budget: 'budget',
-} as const;
-
-// ─── Auth ───────────────────────────────────────────────────────────────────
-
-export function login(email: string): { user: User; subscriptions: Subscription[]; activities: Activity[]; insights: Insight[] } {
-  const account = getAccount(email);
-  const user: User = {
-    email,
-    name: account?.name || email.split('@')[0],
-    joinedAt: account?.joinedAt || new Date().toISOString(),
+/**
+ * Returns the current user from the Supabase session, or null if signed out.
+ * Does NOT touch the database — used as a cheap check on app boot.
+ */
+export async function getSessionUser(): Promise<User | null> {
+  const { data } = await supabase.auth.getSession();
+  const u = data.session?.user;
+  if (!u) return null;
+  return {
+    email: u.email ?? '',
+    name: (u.user_metadata?.name as string) || (u.email?.split('@')[0] ?? 'User'),
+    joinedAt: u.created_at,
   };
-  const subscriptions = generateEmailBasedSubscriptions(email);
-  const activities = generateActivities(email, subscriptions);
-  const insights = generateInsights(email, subscriptions);
-
-  // Persist
-  storage.set(KEYS.user, user);
-  storage.set(KEYS.subscriptions, subscriptions);
-  storage.set(KEYS.activities, activities);
-  storage.set(KEYS.insights, insights);
-
-  return { user, subscriptions, activities, insights };
 }
 
-export function logout(): void {
-  storage.clear();
+/**
+ * Loads the user's profile + data from Supabase. If the user has no
+ * subscriptions yet, seeds them with deterministic mock data so the dashboard
+ * isn't empty on first login.
+ */
+export async function loadUserData(): Promise<{
+  user: User;
+  profile: db.UserSettings;
+  subscriptions: Subscription[];
+  activities: Activity[];
+  insights: Insight[];
+} | null> {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) return null;
+
+  // Ensure the profile row exists (the DB trigger does this on signup, but we
+  // also handle the case where the trigger is missing or a user was created
+  // before the trigger was installed).
+  const { data: authUser } = await supabase.auth.getUser();
+  if (!authUser.user) return null;
+
+  let profile = await db.getProfile();
+  if (!profile) {
+    // Create the row explicitly as a fallback.
+    await supabase.from('profiles').upsert({
+      id: authUser.user.id,
+      email: authUser.user.email ?? sessionUser.email,
+      name: sessionUser.name,
+      joined_at: sessionUser.joinedAt,
+    }, { onConflict: 'id' });
+    profile = await db.getProfile();
+  }
+  if (!profile) return null;
+
+  // Seed each table if it's empty for this user.
+  const existingSubs = await db.getSubscriptions();
+  let subscriptions = existingSubs;
+  if (subscriptions.length === 0) {
+    // Use deterministic per-user data so it looks like an "email scan" result.
+    const seed = storage.get<Subscription[] | null>('seed_subs', null)
+      ?? generateEmailBasedSubscriptions(sessionUser.email);
+    await db.seedSubscriptionsIfEmpty(seed);
+    subscriptions = await db.getSubscriptions();
+  }
+
+  let activities = await db.getActivities();
+  if (activities.length === 0) {
+    const seedActs = generateActivities(sessionUser.email, subscriptions);
+    await db.seedActivitiesIfEmpty(seedActs);
+    activities = await db.getActivities();
+  }
+
+  let insights = await db.getInsights();
+  if (insights.length === 0) {
+    const seedInsights = generateInsights(sessionUser.email, subscriptions);
+    await db.seedInsightsIfEmpty(seedInsights);
+    insights = await db.getInsights();
+  }
+
+  return {
+    user: {
+      email: profile.email,
+      name: profile.name,
+      joinedAt: profile.joinedAt,
+    },
+    profile,
+    subscriptions,
+    activities,
+    insights,
+  };
 }
 
-export function getUser(): User | null {
-  return storage.get<User | null>(KEYS.user, null);
+/**
+ * Signs the user out of Supabase. The store clears local state separately.
+ */
+export async function logout(): Promise<void> {
+  await supabase.auth.signOut();
 }
 
 // ─── Subscriptions ──────────────────────────────────────────────────────────
 
-export function getSubscriptions(): Subscription[] {
-  return storage.get<Subscription[]>(KEYS.subscriptions, defaultSubscriptions);
-}
-
-export function addSubscription(sub: Omit<Subscription, 'id' | 'createdAt'>): Subscription {
-  const newSub: Subscription = {
-    ...sub,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString().split('T')[0],
-  };
-  const subs = [newSub, ...getSubscriptions()];
-  storage.set(KEYS.subscriptions, subs);
-  return newSub;
-}
-
-export function updateSubscription(id: string, updates: Partial<Subscription>): Subscription | null {
-  const subs = getSubscriptions();
-  const idx = subs.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
-  subs[idx] = { ...subs[idx], ...updates };
-  storage.set(KEYS.subscriptions, subs);
-  return subs[idx];
-}
-
-export function deleteSubscription(id: string): Subscription | null {
-  const subs = getSubscriptions();
-  const idx = subs.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
-  const removed = subs[idx];
-  storage.set(KEYS.subscriptions, subs.filter((s) => s.id !== id));
-  return removed;
-}
-
-export function toggleSubscriptionStatus(id: string): Subscription | null {
-  const sub = getSubscriptions().find((s) => s.id === id);
-  if (!sub) return null;
-  const newStatus = sub.status === 'active' ? 'paused' : 'active';
-  return updateSubscription(id, { status: newStatus as Subscription['status'] });
-}
+export const getSubscriptions = db.getSubscriptions;
+export const addSubscription = db.addSubscription;
+export const updateSubscription = db.updateSubscription;
+export const deleteSubscription = db.deleteSubscription;
+export const toggleSubscriptionStatus = db.toggleSubscriptionStatus;
 
 // ─── Activities ─────────────────────────────────────────────────────────────
 
-export function getActivities(): Activity[] {
-  return storage.get<Activity[]>(KEYS.activities, defaultActivities);
-}
-
-export function addActivity(activity: Omit<Activity, 'id'>): Activity {
-  const newAct: Activity = { ...activity, id: crypto.randomUUID() };
-  const acts = [newAct, ...getActivities()];
-  storage.set(KEYS.activities, acts);
-  return newAct;
-}
-
-export function setActivities(acts: Activity[]): void {
-  storage.set(KEYS.activities, acts);
-}
+export const getActivities = db.getActivities;
+export const addActivity = db.addActivity;
 
 // ─── Insights ───────────────────────────────────────────────────────────────
 
-export function getInsights(): Insight[] {
-  return storage.get<Insight[]>(KEYS.insights, defaultInsights);
-}
+export const getInsights = db.getInsights;
 
-export function setInsights(insights: Insight[]): void {
-  storage.set(KEYS.insights, insights);
-}
+// ─── Settings (profile-backed) ──────────────────────────────────────────────
 
-// ─── Settings ───────────────────────────────────────────────────────────────
-
-export function getCurrency(): string {
-  return storage.get<string>(KEYS.currency, DEFAULTS.currency);
+export async function getCurrency(): Promise<string> {
+  const p = await db.getProfile();
+  return p?.currency ?? DEFAULTS.currency;
 }
+export const setCurrency = (currency: string) =>
+  db.upsertProfileSettings({ currency });
 
-export function setCurrency(currency: string): void {
-  storage.set(KEYS.currency, currency);
+export async function getBudget(): Promise<number> {
+  const p = await db.getProfile();
+  return p?.budget ?? DEFAULTS.budget;
 }
+export const setBudget = (budget: number) =>
+  db.upsertProfileSettings({ budget });
 
-export function getBudget(): number {
-  return storage.get<number>(KEYS.budget, DEFAULTS.budget);
+export async function getNotifications(): Promise<boolean> {
+  const p = await db.getProfile();
+  return p?.notifications ?? DEFAULTS.notifications;
 }
+export const setNotifications = (enabled: boolean) =>
+  db.upsertProfileSettings({ notifications: enabled });
 
-export function setBudget(budget: number): void {
-  storage.set(KEYS.budget, budget);
+export async function getEmailAlerts(): Promise<boolean> {
+  const p = await db.getProfile();
+  return p?.emailAlerts ?? DEFAULTS.emailAlerts;
 }
+export const setEmailAlerts = (enabled: boolean) =>
+  db.upsertProfileSettings({ emailAlerts: enabled });
 
-export function getNotifications(): boolean {
-  return storage.get<boolean>(KEYS.notifications, DEFAULTS.notifications);
+export async function getWeeklyReports(): Promise<boolean> {
+  const p = await db.getProfile();
+  return p?.weeklyReports ?? DEFAULTS.weeklyReports;
 }
+export const setWeeklyReports = (enabled: boolean) =>
+  db.upsertProfileSettings({ weeklyReports: enabled });
 
-export function setNotifications(enabled: boolean): void {
-  storage.set(KEYS.notifications, enabled);
-}
-
-export function getEmailAlerts(): boolean {
-  return storage.get<boolean>(KEYS.emailAlerts, DEFAULTS.emailAlerts);
-}
-
-export function setEmailAlerts(enabled: boolean): void {
-  storage.set(KEYS.emailAlerts, enabled);
-}
-
-export function getWeeklyReports(): boolean {
-  return storage.get<boolean>(KEYS.weeklyReports, DEFAULTS.weeklyReports);
-}
-
-export function setWeeklyReports(enabled: boolean): void {
-  storage.set(KEYS.weeklyReports, enabled);
-}
+// ─── Re-exports for local one-time migration ────────────────────────────────
+export { defaultSubscriptions, defaultActivities, defaultInsights };
