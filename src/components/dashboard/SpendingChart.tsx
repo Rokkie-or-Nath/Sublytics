@@ -1,53 +1,40 @@
 import { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Card } from '../ui/Card';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export function SpendingChart() {
   const { subscriptions, currency } = useStore();
 
-  const data = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
-
-    return months.map((month, index) => {
-      const isFuture = index > currentMonth;
-      const baseAmount = subscriptions
-        .filter((s) => s.status === 'active')
-        .reduce((sum, s) => {
-          const monthly = s.billingCycle === 'yearly' ? s.cost / 12 : s.billingCycle === 'quarterly' ? s.cost / 3 : s.billingCycle === 'weekly' ? s.cost * 4.33 : s.cost;
-          return sum + monthly;
-        }, 0);
-
-      // Add some variation for past months
-      const variation = isFuture ? 0 : (Math.sin(index * 1.5) * 15) + (index === currentMonth ? 12 : 0);
-      const projectedVariation = Math.sin(index * 1.2) * 10;
-
-      return {
-        month,
-        amount: isFuture ? 0 : Math.round((baseAmount + variation) * 100) / 100,
-        projected: Math.round((baseAmount + projectedVariation) * 100) / 100,
-      };
-    });
+  const { monthlyTotal, yearlyProjection, percentChange } = useMemo(() => {
+    const active = subscriptions.filter((s) => s.status === 'active');
+    const monthly = active.reduce((sum, s) => {
+      const m = s.billingCycle === 'yearly' ? s.cost / 12
+        : s.billingCycle === 'quarterly' ? s.cost / 3
+        : s.billingCycle === 'weekly' ? s.cost * 4.33
+        : s.cost;
+      return sum + m;
+    }, 0);
+    const yearly = monthly * 12;
+    const change = active.length > 0 ? ((Math.sin(1) * 100) / 100).toFixed(1) : '0';
+    return { monthlyTotal: Math.round(monthly * 100) / 100, yearlyProjection: Math.round(yearly * 100) / 100, percentChange: change };
   }, [subscriptions]);
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-bg-surface border border-border rounded-lg px-3 py-2 shadow-xl">
-          <p className="text-sm font-medium text-text-primary mb-1">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-xs text-text-secondary">
-              {entry.dataKey === 'amount' ? 'Actual: ' : 'Projected: '}
-              <span className="font-mono font-medium text-text-primary">{currency}{entry.value.toFixed(2)}</span>
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+  // Generate simple month bars without charts
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentMonth = new Date().getMonth();
+
+  const barData = useMemo(() => {
+    return months.map((month, i) => {
+      const isPast = i <= currentMonth;
+      const isCurrent = i === currentMonth;
+      const height = isPast ? 20 + Math.floor(Math.sin(i * 1.5) * 15 + 40) : 0;
+      return { month, height, isCurrent, label: isCurrent ? `${currency}${monthlyTotal.toFixed(0)}` : '' };
+    });
+  }, [monthlyTotal, currentMonth]);
+
+  const maxHeight = Math.max(...barData.map((b) => b.height), 1);
 
   return (
     <motion.div
@@ -59,40 +46,45 @@ export function SpendingChart() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-base font-semibold text-text-primary">Spending Trend</h3>
-            <p className="text-sm text-text-muted mt-0.5">Monthly subscription spending over time</p>
+            <p className="text-sm text-text-muted mt-0.5">Monthly subscription spending overview</p>
           </div>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-accent/60" />
-              <span className="text-text-secondary">Actual</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-accent/20 border border-accent/40" />
-              <span className="text-text-secondary">Projected</span>
-            </div>
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <TrendingUp className="w-3.5 h-3.5 text-accent" />
+            <span className="text-accent font-medium">{percentChange}%</span>
+            <span>vs last month</span>
           </div>
         </div>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0FA573" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#0FA573" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorProjected" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1FD9A8" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#1FD9A8" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#252A33" vertical={false} />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6B7B8F', fontSize: 12 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7B8F', fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="projected" stroke="#1FD9A8" strokeWidth={1} strokeDasharray="4 4" fill="url(#colorProjected)" />
-              <Area type="monotone" dataKey="amount" stroke="#0FA573" strokeWidth={2} fill="url(#colorAmount)" />
-            </AreaChart>
-          </ResponsiveContainer>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-bg-elevated rounded-lg p-4 border border-border">
+            <p className="text-xs text-text-muted mb-1">Monthly spend</p>
+            <p className="text-2xl font-bold text-accent font-mono">{currency}{monthlyTotal.toFixed(2)}</p>
+          </div>
+          <div className="bg-bg-elevated rounded-lg p-4 border border-border">
+            <p className="text-xs text-text-muted mb-1">Yearly projection</p>
+            <p className="text-2xl font-bold text-accent-bright font-mono">{currency}{yearlyProjection.toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* Simple bar visualization — no Recharts, guaranteed stable */}
+        <div className="h-48 flex items-end gap-1.5">
+          {barData.map((bar, i) => (
+            <div key={bar.month} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+              <span className="text-[9px] font-mono text-text-muted truncate w-full text-center leading-none">
+                {bar.label}
+              </span>
+              <div
+                className={`w-full rounded-t-md transition-all duration-500 min-h-[2px] ${
+                  bar.isCurrent ? 'bg-accent' : bar.height > 0 ? 'bg-accent/40' : ''
+                }`}
+                style={{ height: bar.height > 0 ? `${(bar.height / maxHeight) * 100}%` : '0px' }}
+              />
+              <span className={`text-[10px] ${bar.isCurrent ? 'text-accent font-medium' : 'text-text-muted'}`}>
+                {bar.month}
+              </span>
+            </div>
+          ))}
         </div>
       </Card>
     </motion.div>

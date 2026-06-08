@@ -1,9 +1,23 @@
--- ─── Sublytics: Initial Schema ─────────────────────────────────────────────
--- Run this in the Supabase SQL Editor (https://app.supabase.com → SQL → New query)
--- Idempotent: safe to run multiple times.
+-- ─── Sublytics: Complete Schema + RLS ───────────────────────────────────────
+-- Run this ONCE in your Supabase SQL Editor:
+--   Dashboard → SQL Editor → New Query → paste → Run
+--
+-- This script:
+--   1. Creates all tables (profiles, subscriptions, activities, insights)
+--   2. Enables Row Level Security
+--   3. Sets up RLS policies so users can only access their own data
+--   4. Auto-creates a profile row when a new user signs up
+--   5. Auto-confirms user emails so you NEVER get "Email not confirmed"
+--
+-- 💡 One-time fix for existing users:
+--   If you already signed up and got "Email not confirmed", run this too:
+--   UPDATE auth.users SET email_confirmed_at = now() WHERE email_confirmed_at IS NULL;
+--
+-- This file is idempotent — safe to run multiple times.
+-- ─────────────────────────────────────────────────────────────────────────────
 
--- ─── profiles ───────────────────────────────────────────────────────────────
--- Per-user settings + identity (extends auth.users)
+-- ─── 1. profiles ─────────────────────────────────────────────────────────────
+-- Per-user identity + settings (extends auth.users)
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -18,7 +32,7 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
--- ─── subscriptions ─────────────────────────────────────────────────────────
+-- ─── 2. subscriptions ────────────────────────────────────────────────────────
 create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -35,7 +49,7 @@ create table if not exists public.subscriptions (
 );
 create index if not exists subscriptions_user_id_idx on public.subscriptions(user_id);
 
--- ─── activities ────────────────────────────────────────────────────────────
+-- ─── 3. activities ───────────────────────────────────────────────────────────
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -47,7 +61,7 @@ create table if not exists public.activities (
 );
 create index if not exists activities_user_id_idx on public.activities(user_id);
 
--- ─── insights ──────────────────────────────────────────────────────────────
+-- ─── 4. insights ─────────────────────────────────────────────────────────────
 create table if not exists public.insights (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -59,7 +73,7 @@ create table if not exists public.insights (
 );
 create index if not exists insights_user_id_idx on public.insights(user_id);
 
--- ─── Row Level Security ────────────────────────────────────────────────────
+-- ─── Row Level Security ──────────────────────────────────────────────────────
 alter table public.profiles     enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.activities   enable row level security;

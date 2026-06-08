@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { SubscriptionCard } from '../components/subscriptions/SubscriptionCard';
-import { AddSubscriptionModal } from '../components/subscriptions/AddSubscriptionModal';
+import { QuickAddPanel } from '../components/subscriptions/QuickAddPanel';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Sparkles, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Input } from '../components/ui/Input';
 
@@ -18,6 +18,7 @@ export function SubscriptionsPage() {
   } = useStore();
 
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   const categories = useMemo(() => {
     const cats = new Set(subscriptions.map((s) => s.category));
@@ -82,7 +83,7 @@ export function SubscriptionsPage() {
 
   return (
     <div className="space-y-6">
-      <AddSubscriptionModal />
+      {showQuickAdd && <QuickAddPanel onClose={() => setShowQuickAdd(false)} />}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -92,9 +93,18 @@ export function SubscriptionsPage() {
             {filtered.length} subscription{filtered.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsAddModalOpen(true)}>
-          Add Subscription
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            leftIcon={<Sparkles className="w-4 h-4" />}
+            onClick={() => setShowQuickAdd(true)}
+          >
+            Quick Add
+          </Button>
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsAddModalOpen(true)}>
+            Add Subscription
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

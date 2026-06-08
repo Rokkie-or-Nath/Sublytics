@@ -6,13 +6,7 @@
 
 import * as db from './db';
 import { supabase } from './supabase';
-import { storage } from './storage';
-import {
-  generateEmailBasedSubscriptions,
-  generateActivities,
-  generateInsights,
-} from './mock-data';
-import type { Subscription, Activity, Insight, User } from '../types';
+import type { User, Subscription, Activity, Insight } from '../types';
 import { DEFAULTS } from '../constants/defaults';
 
 // ─── Auth / session lifecycle ───────────────────────────────────────────────
@@ -42,9 +36,8 @@ export async function getSessionUser(): Promise<User | null> {
 }
 
 /**
- * Loads the user's profile + data from Supabase. If the user has no
- * subscriptions yet, seeds them with deterministic mock data so the dashboard
- * isn't empty on first login.
+ * Loads the user's profile + data from Supabase.
+ * New users start with an empty dashboard — no mock data is seeded.
  */
 export async function loadUserData(): Promise<{
   user: User;
@@ -88,37 +81,19 @@ export async function loadUserData(): Promise<{
   }
   console.log('[Sublytics] profile loaded:', profile.email);
 
-  // Subscriptions
+  // Subscriptions — never seed fake data. The user starts with an empty list.
   console.log('[Sublytics] loadUserData: fetching subscriptions…');
-  const existingSubs = await db.getSubscriptions();
-  let subscriptions = existingSubs;
-  if (subscriptions.length === 0) {
-    console.log('[Sublytics] no subs yet, seeding…');
-    const seed = storage.get<Subscription[] | null>('seed_subs', null)
-      ?? generateEmailBasedSubscriptions(sessionUser.email);
-    await db.seedSubscriptionsIfEmpty(seed);
-    subscriptions = await db.getSubscriptions();
-  }
+  const subscriptions = await db.getSubscriptions();
   console.log('[Sublytics] subscriptions loaded:', subscriptions.length);
 
   // Activities
   console.log('[Sublytics] loadUserData: fetching activities…');
-  let activities = await db.getActivities();
-  if (activities.length === 0) {
-    const seedActs = generateActivities(sessionUser.email, subscriptions);
-    await db.seedActivitiesIfEmpty(seedActs);
-    activities = await db.getActivities();
-  }
+  const activities = await db.getActivities();
   console.log('[Sublytics] activities loaded:', activities.length);
 
   // Insights
   console.log('[Sublytics] loadUserData: fetching insights…');
-  let insights = await db.getInsights();
-  if (insights.length === 0) {
-    const seedInsights = generateInsights(sessionUser.email, subscriptions);
-    await db.seedInsightsIfEmpty(seedInsights);
-    insights = await db.getInsights();
-  }
+  const insights = await db.getInsights();
   console.log('[Sublytics] insights loaded:', insights.length);
 
   return {

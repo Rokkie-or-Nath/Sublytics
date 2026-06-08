@@ -7,7 +7,7 @@ import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Diamond, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { onAuthStateChange } from './lib/accounts';
 
@@ -72,8 +72,10 @@ function FullScreenLoader() {
   const [, force] = useState(0);
 
   // Subscribe to log buffer updates so the on-page log list re-renders.
+  // Use setTimeout to avoid "Cannot update during render" warnings when
+  // pushLog is called during another component's render cycle.
   useEffect(() => {
-    const cb = () => force((n) => n + 1);
+    const cb = () => setTimeout(() => force((n) => n + 1), 0);
     logListeners.add(cb);
     return () => { logListeners.delete(cb); };
   }, []);
@@ -257,8 +259,9 @@ export default function App() {
 
   // 2. React to Supabase auth state changes (sign-out, token refresh,
   //    session expiry in another tab, etc.) so the local store stays in sync.
-  //    IMPORTANT: Only react to *subsequent* auth events — skip the initial
-  //    "SIGNED_IN" event that fires on page load (we already called initAuth above).
+  //    IMPORTANT: Only subscribe ONCE — no dependency on initAuth/logout to
+  //    prevent re-subscribing on every page navigation (which would trigger
+  //    a full initAuth() reload and freeze the UI).
   useEffect(() => {
     let isFirstEvent = true;
     const { data: sub } = onAuthStateChange((user) => {
@@ -273,7 +276,8 @@ export default function App() {
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [initAuth, logout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isInitializing) {
     return (
@@ -317,17 +321,14 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Layout>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-          >
-            {renderPage()}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={currentPage}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+        >
+          {renderPage()}
+        </motion.div>
       </Layout>
     </ErrorBoundary>
   );

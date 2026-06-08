@@ -65,7 +65,7 @@ export function SubscriptionCard({ subscription, index }: SubscriptionCardProps)
         )}
       </div>
 
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={() => toggleSubscriptionStatus(subscription.id)}
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"

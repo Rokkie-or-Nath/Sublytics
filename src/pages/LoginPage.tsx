@@ -144,9 +144,16 @@ export function LoginPage({ onSwitchToSignup }: LoginPageProps) {
 
           {/* Error */}
           {error && (
-            <p className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <div>
+              <p className="text-sm text-danger bg-danger/10 border border-danger/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
+              {error.toLowerCase().includes('email') && (
+                <p className="text-xs text-text-muted mt-2">
+                  Tip: Try signing up with a different email address instead, or clear your browser local storage and reload.
+                </p>
+              )}
+            </div>
           )}
 
           {/* Submit */}

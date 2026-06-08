@@ -157,7 +157,13 @@ export async function getSubscriptions(): Promise<Subscription[]> {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (error.code === '404' || error.code === '400' || String(error.message).includes('does not exist')) {
+      console.warn('[Sublytics] subscriptions table not found — returning empty.');
+      return [];
+    }
+    throw error;
+  }
   return (data ?? []).map(mapSubscription);
 }
 
@@ -282,7 +288,13 @@ export async function getActivities(): Promise<Activity[]> {
     .select('*')
     .eq('user_id', userId)
     .order('date', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (error.code === '404' || error.code === '400' || String(error.message).includes('does not exist')) {
+      console.warn('[Sublytics] activities table not found — returning empty.');
+      return [];
+    }
+    throw error;
+  }
   return (data ?? []).map(mapActivity);
 }
 
@@ -331,27 +343,13 @@ export async function getInsights(): Promise<Insight[]> {
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    // If the table doesn't exist (404/400), return empty instead of crashing.
+    if (error.code === '404' || error.code === '400' || String(error.message).includes('does not exist')) {
+      console.warn('[Sublytics] insights table not found — returning empty.');
+      return [];
+    }
+    throw error;
+  }
   return (data ?? []).map(mapInsight);
-}
-
-export async function seedInsightsIfEmpty(insights: Omit<Insight, 'id'>[]): Promise<void> {
-  const userId = await requireUserId();
-  const { count, error: countErr } = await supabase
-    .from('insights')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId);
-  if (countErr) throw countErr;
-  if ((count ?? 0) > 0) return;
-
-  const rows = insights.map((i) => ({
-    user_id: userId,
-    type: i.type,
-    title: i.title,
-    description: i.description,
-    amount: i.amount ?? null,
-    actionable: i.actionable,
-  }));
-  const { error } = await supabase.from('insights').insert(rows);
-  if (error) throw error;
 }

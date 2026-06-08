@@ -103,7 +103,12 @@ export const useStore = create<AppState>((set) => ({
   detectionMessage: '',
 
   initAuth: async () => {
-    set({ isInitializing: true, initError: '' });
+    // If the user is already authenticated, skip the loading UI to prevent
+    // flickering the FullScreenLoader on page navigation.
+    set((state) => {
+      if (state.isAuthenticated) return {};
+      return { isInitializing: true, initError: '' };
+    });
 
     // If .env still has placeholder Supabase values, bail out cleanly
     // instead of letting the requests hang.
