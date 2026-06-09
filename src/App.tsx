@@ -224,14 +224,27 @@ function ConfigErrorScreen({ message }: { message: string }) {
         <p className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
           {message}
         </p>
+
+        {/* Local dev instructions */}
         <div className="mt-6 p-4 bg-bg-elevated rounded-lg text-xs font-mono text-text-muted">
-          <p className="mb-2 text-text-secondary">Quick start:</p>
-          <p>1. Sign up free at <span className="text-accent">https://supabase.com</span></p>
+          <p className="mb-2 text-text-secondary font-semibold">For local development:</p>
+          <p>1. Sign up at <span className="text-accent">https://supabase.com</span></p>
           <p>2. Create a new project</p>
           <p>3. Run the SQL in <code className="text-accent">supabase/migrations/001_initial_schema.sql</code> in the SQL Editor</p>
           <p>4. Copy your URL + anon key from Project Settings → API</p>
           <p>5. Paste them into <code className="text-accent">.env</code></p>
           <p>6. Restart <code className="text-accent">npm run dev</code></p>
+        </div>
+
+        {/* Vercel deployment instructions */}
+        <div className="mt-4 p-4 bg-bg-elevated rounded-lg text-xs font-mono text-text-muted">
+          <p className="mb-2 text-text-secondary font-semibold">For Vercel deployment:</p>
+          <p>1. Go to <span className="text-accent">vercel.com/dashboard</span> → your project</p>
+          <p>2. Settings → Environment Variables</p>
+          <p>3. Add <code className="text-accent">VITE_SUPABASE_URL</code> = your Supabase URL</p>
+          <p>4. Add <code className="text-accent">VITE_SUPABASE_ANON_KEY</code> = your anon key</p>
+          <p>5. Make sure to add them for <span className="text-text-primary">Production</span> environment</p>
+          <p>6. Redeploy your project</p>
         </div>
       </div>
     </div>

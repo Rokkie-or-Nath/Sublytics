@@ -67,6 +67,60 @@ npm run dev
 
 ---
 
+## ▲ Deploy to Vercel
+
+### Step 1: Push to GitHub
+
+```bash
+git add .
+git commit -m "Initial commit"
+git push
+```
+
+### Step 2: Import to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project**
+2. Import your GitHub repository
+3. Vercel will auto-detect it's a Vite app
+
+### Step 3: Add environment variables
+
+**CRITICAL** — without these, the app will show "Supabase isn't configured yet":
+
+1. In Vercel, go to your project → **Settings** → **Environment Variables**
+2. Add these two variables (set them for **Production**, **Preview**, and **Development**):
+
+| Name | Value |
+|------|-------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key |
+
+3. Click **Save** for each
+
+### Step 4: Deploy
+
+1. Click **Deploy**
+2. Wait for the build to complete (~30 seconds)
+3. Open your live URL — it should work!
+
+> ⚠️ **After changing environment variables**, you must redeploy (Settings → Deployments → click the 3 dots on the latest → Redeploy) for them to take effect.
+
+---
+
+## 🛑 Troubleshooting "Supabase isn't configured yet" on Vercel
+
+If your deployed app shows this error, it means the environment variables aren't set correctly:
+
+1. Go to Vercel Dashboard → your project → **Settings** → **Environment Variables**
+2. Verify both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` exist
+3. Make sure they have values (not empty)
+4. Verify they're enabled for the **Production** environment
+5. After changes, **redeploy** the project
+
+The variable names are case-sensitive and **must** start with `VITE_` for Vite to expose them to the browser.
+
+---
+
 ## 📋 Features
 
 - **Dashboard** — Overview of monthly spending, upcoming bills, and recent activity
