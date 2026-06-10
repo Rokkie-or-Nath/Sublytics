@@ -61,9 +61,6 @@ interface AppState {
   insights: Insight[];
   setInsights: (insights: Insight[]) => void;
 
-  // Profile
-  updateProfile: (updates: { name?: string; avatarUrl?: string }) => Promise<void>;
-
   // UI
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -341,18 +338,6 @@ export const useStore = create<AppState>((set) => ({
   },
 
   setSubscriptions: (subs) => set({ subscriptions: subs }),
-
-  // ─── Profile ──────────────────────────────────────────────────────────────
-  updateProfile: async ({ name, avatarUrl }) => {
-    await service.updateProfile({ name, avatarUrl });
-    set((state) => ({
-      user: state.user ? {
-        ...state.user,
-        ...(name !== undefined && { name }),
-        ...(avatarUrl !== undefined && { avatar: avatarUrl }),
-      } : state.user,
-    }));
-  },
 
   // ─── Activities ───────────────────────────────────────────────────────────
   activities: [],
