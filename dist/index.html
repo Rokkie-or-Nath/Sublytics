@@ -2,20 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Sublytics — Subscription Intelligence Platform</title>
 
-    <!-- PWA -->
+    <!-- PWA: Primary manifest -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#8B5CF6" />
+
+    <!-- PWA: Android -->
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- PWA: iOS (Safari) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Sublytics" />
+
+    <!-- Apple Touch Icons (proper sizes for each device) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <script type="module" crossorigin src="/assets/index-D6XTCMb-.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-c74yf_Gk.css">
-  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+
+    <!-- iOS splash screen: native resolution images prevent white flash on launch -->
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+
+    <!-- PWA: Windows / IE -->
+    <meta name="msapplication-TileColor" content="#0a0a0f" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+
+    <!-- iOS fullscreen meta (backup) -->
+    <meta name="apple-touch-fullscreen" content="yes" />
+
+    <!-- Prevent flash of white background on cold start (applied before CSS loads) -->
+    <style>
+      html { background: #0a0a0f; }
+    </style>
+    <script type="module" crossorigin src="/assets/index-CQ3_j2jc.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BQsHZfYd.css">
+  <link rel="manifest" href="/manifest.webmanifest"></head>
   <body>
     <div id="root"></div>
   </body>

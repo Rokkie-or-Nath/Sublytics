@@ -7,6 +7,8 @@ import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { PWAInstallPrompt } from './components/shared/PWAInstallPrompt';
+import { PWAUpdatePrompt } from './components/shared/PWAUpdatePrompt';
 import { motion } from 'framer-motion';
 import { Diamond, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { onAuthStateChange } from './lib/accounts';
@@ -275,17 +277,29 @@ export default function App() {
   //    IMPORTANT: Only subscribe ONCE — no dependency on initAuth/logout to
   //    prevent re-subscribing on every page navigation (which would trigger
   //    a full initAuth() reload and freeze the UI).
+  //
+  //    CRITICAL: We skip the FIRST event because it fires on subscription
+  //    creation with the current session — initAuth() already handled that.
+  //    On subsequent events (sign-out from another tab, token refresh
+  //    failure) we react by re-initializing or logging out.
   useEffect(() => {
     let isFirstEvent = true;
+    let inflightSessionCheck = false;
     const { data: sub } = onAuthStateChange((user) => {
       if (isFirstEvent) {
         isFirstEvent = false;
         return; // Skip the initial auth state broadcast; initAuth() already handled it.
       }
+      // Avoid stacking redundant initAuth calls if the auth state flips
+      // multiple times quickly (e.g. token refresh cycle).
+      if (inflightSessionCheck) return;
+      inflightSessionCheck = true;
+
       if (user) {
-        initAuth();
+        initAuth().finally(() => { inflightSessionCheck = false; });
       } else {
         logout();
+        inflightSessionCheck = false;
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -343,6 +357,8 @@ export default function App() {
           {renderPage()}
         </motion.div>
       </Layout>
+      <PWAInstallPrompt />
+      <PWAUpdatePrompt />
     </ErrorBoundary>
   );
 }

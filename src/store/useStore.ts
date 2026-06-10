@@ -27,9 +27,9 @@ interface AppState {
   // Auth
   user: User | null;
   isAuthenticated: boolean;
-  isInitializing: boolean;          // true on first session check
-  initError: string;                // set when initAuth fails (e.g. bad .env)
-  isDetecting: boolean;             // true during the "email scan" animation
+  isInitializing: boolean;
+  initError: string;
+  isDetecting: boolean;
   detectionProgress: number;
   detectionMessage: string;
   initAuth: () => Promise<void>;
@@ -96,91 +96,123 @@ export const useStore = create<AppState>((set) => ({
   // ─── Auth ─────────────────────────────────────────────────────────────────
   user: null,
   isAuthenticated: false,
-  isInitializing: true,             // start as "still figuring out who you are"
+  isInitializing: true,
   initError: '',
   isDetecting: false,
   detectionProgress: 0,
   detectionMessage: '',
 
-  initAuth: async () => {
-    // If the user is already authenticated, skip the loading UI to prevent
-    // flickering the FullScreenLoader on page navigation.
-    set((state) => {
-      if (state.isAuthenticated) return {};
-      return { isInitializing: true, initError: '' };
-    });
+  initAuth: (() => {
+    let inflightPromise: Promise<void> | null = null;
 
-    // If .env still has placeholder Supabase values, bail out cleanly
-    // instead of letting the requests hang.
-    if (!isSupabaseConfigured) {
-      set({
-        user: null,
-        isAuthenticated: false,
-        isInitializing: false,
-        initError: SUPABASE_NOT_CONFIGURED_MSG,
+    return async () => {
+      // Deduplicate: if an initAuth is already running, return the same promise.
+      // This prevents two concurrent Supabase request chains that race each
+      // other and congest the connection pool on cold starts (Vercel).
+      if (inflightPromise) return inflightPromise;
+
+      // If the user is already authenticated, skip the loading UI to prevent
+      // flickering the FullScreenLoader on page navigation.
+      set((state) => {
+        if (state.isAuthenticated) return {};
+        return { isInitializing: true, initError: '' };
       });
-      return;
-    }
 
-    try {
-      const LOAD_TIMEOUT_MS = 15_000; // 15 seconds max to load user data
-      const data = await withTimeout(service.loadUserData(), LOAD_TIMEOUT_MS, 'loadUserData');
-      if (!data) {
-        set({ user: null, isAuthenticated: false, isInitializing: false });
+      // If .env still has placeholder Supabase values, bail out cleanly
+      // instead of letting the requests hang.
+      if (!isSupabaseConfigured) {
+        set({
+          user: null,
+          isAuthenticated: false,
+          isInitializing: false,
+          initError: SUPABASE_NOT_CONFIGURED_MSG,
+        });
         return;
       }
-      set({
-        user: data.user,
-        isAuthenticated: true,
-        isInitializing: false,
-        subscriptions: data.subscriptions,
-        activities: data.activities,
-        insights: data.insights,
-        currency: data.profile.currency,
-        notifications: data.profile.notifications,
-        emailAlerts: data.profile.emailAlerts,
-        weeklyReports: data.profile.weeklyReports,
-        budget: data.profile.budget,
-      });
-    } catch (err) {
-      // ANY failure here (network, bad env, missing tables, etc.) must
-      // still flip isInitializing to false so the UI doesn't hang forever.
-      // eslint-disable-next-line no-console
-      console.error('[Sublytics] initAuth failed:', err);
-      set({
-        user: null,
-        isAuthenticated: false,
-        isInitializing: false,
-        initError:
-          (err instanceof Error ? err.message : String(err)) ||
-          'Failed to connect to Supabase. Check your .env and that the schema is applied.',
-      });
-    }
-  },
 
-  logout: async () => {
-    await service.logout();
-    set({
-      user: null,
-      isAuthenticated: false,
-      isInitializing: false,
-      initError: '',
-      subscriptions: [],
-      activities: [],
-      insights: [],
-      currentPage: 'dashboard',
-      searchQuery: '',
-      selectedCategory: null,
-    });
-  },
+      inflightPromise = (async () => {
+        try {
+          // Use a longer timeout (30s) for Vercel cold starts where the
+          // Supabase connection may take several seconds to establish.
+          const LOAD_TIMEOUT_MS = 30_000;
+          const data = await withTimeout(service.loadUserData(), LOAD_TIMEOUT_MS, 'loadUserData');
+          if (!data) {
+            set({ user: null, isAuthenticated: false, isInitializing: false });
+            return;
+          }
+          set({
+            user: data.user,
+            isAuthenticated: true,
+            isInitializing: false,
+            subscriptions: data.subscriptions,
+            activities: data.activities,
+            insights: data.insights,
+            currency: data.profile.currency,
+            notifications: data.profile.notifications,
+            emailAlerts: data.profile.emailAlerts,
+            weeklyReports: data.profile.weeklyReports,
+            budget: data.profile.budget,
+          });
+        } catch (err) {
+          console.error('[Sublytics] initAuth failed:', err);
+          set({
+            user: null,
+            isAuthenticated: false,
+            isInitializing: false,
+            initError:
+              (err instanceof Error ? err.message : String(err)) ||
+              'Failed to connect to Supabase. Check your .env and that the schema is applied.',
+          });
+        } finally {
+          inflightPromise = null;
+        }
+      })();
+
+      return inflightPromise;
+    };
+  })(),
+
+  logout: (() => {
+    let inflightLogout: Promise<void> | null = null;
+
+    return async () => {
+      // Deduplicate: if a logout call is already in-flight, return the same
+      // promise. This prevents re-entrant calls caused by onAuthStateChange
+      // firing a SIGNED_OUT event during supabase.auth.signOut(), which
+      // would otherwise create an infinite loop and freeze the screen.
+      if (inflightLogout) return inflightLogout;
+
+      const currentState = useStore.getState();
+      if (!currentState.isAuthenticated) return;
+
+      inflightLogout = (async () => {
+        await service.logout();
+        set({
+          user: null,
+          isAuthenticated: false,
+          isInitializing: false,
+          initError: '',
+          subscriptions: [],
+          activities: [],
+          insights: [],
+          currentPage: 'dashboard',
+          searchQuery: '',
+          selectedCategory: null,
+        });
+      })();
+
+      try {
+        await inflightLogout;
+      } finally {
+        inflightLogout = null;
+      }
+    };
+  })(),
 
   deleteAccount: async () => {
-    // Call the Edge Function (uses service_role key server-side) to delete
-    // the auth user. FK cascades wipe their profile + data automatically.
     const result = await accounts.deleteAccount();
     if (!result.success) return result;
 
-    // Edge function succeeded — sign out locally and reset state.
     await service.logout();
     set({
       user: null,

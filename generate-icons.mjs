@@ -85,7 +85,6 @@ function writePNG(size, outputPath) {
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
   ihdr[8] = 8;  // bit depth
-  ihdr[9] = 2;  // color type: RGB — we'll use RGBA so 6
   ihdr[9] = 6;  // RGBA
   ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   chunks.push(makeChunk('IHDR', ihdr));
@@ -107,5 +106,15 @@ function writePNG(size, outputPath) {
 }
 
 mkdirSync('public/icons', { recursive: true });
+
+// Android / primary PWA icons
 writePNG(192, 'public/icons/icon-192.png');
 writePNG(512, 'public/icons/icon-512.png');
+
+// iOS apple-touch-icon sizes
+writePNG(180, 'public/icons/icon-180.png');
+writePNG(152, 'public/icons/icon-152.png');
+writePNG(120, 'public/icons/icon-120.png');
+
+// Favicon / small tile
+writePNG(96, 'public/icons/icon-96.png');

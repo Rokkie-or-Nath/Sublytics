@@ -1,13 +1,41 @@
 {
-  "name": "Sublytics",
+  "name": "Sublytics — Subscription Intelligence",
   "short_name": "Sublytics",
   "description": "Track, analyze, and optimize all your subscriptions in one place.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "minimal-ui", "standalone"],
   "background_color": "#0a0a0f",
   "theme_color": "#8B5CF6",
   "orientation": "portrait-primary",
+  "categories": ["finance", "productivity", "utilities"],
+  "lang": "en-US",
   "icons": [
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-120.png",
+      "sizes": "120x120",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
@@ -20,5 +48,8 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "edge_side_panel": {
+    "preferred_width": 360
+  }
 }

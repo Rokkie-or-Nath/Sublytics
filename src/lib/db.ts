@@ -289,7 +289,15 @@ export async function getActivities(): Promise<Activity[]> {
     .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) {
-    if (error.code === '404' || error.code === '400' || String(error.message).includes('does not exist')) {
+    // Gracefully handle missing table (schema not applied yet).
+    if (
+      error.code === '404' ||
+      error.code === '400' ||
+      String(error.code) === '42P01' ||
+      String(error.message).toLowerCase().includes('does not exist') ||
+      String(error.message).toLowerCase().includes('relation') ||
+      String(error.message).toLowerCase().includes('not found')
+    ) {
       console.warn('[Sublytics] activities table not found — returning empty.');
       return [];
     }
@@ -344,8 +352,15 @@ export async function getInsights(): Promise<Insight[]> {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) {
-    // If the table doesn't exist (404/400), return empty instead of crashing.
-    if (error.code === '404' || error.code === '400' || String(error.message).includes('does not exist')) {
+    // Gracefully handle missing table (schema not applied yet).
+    if (
+      error.code === '404' ||
+      error.code === '400' ||
+      String(error.code) === '42P01' ||
+      String(error.message).toLowerCase().includes('does not exist') ||
+      String(error.message).toLowerCase().includes('relation') ||
+      String(error.message).toLowerCase().includes('not found')
+    ) {
       console.warn('[Sublytics] insights table not found — returning empty.');
       return [];
     }

@@ -15,7 +15,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
+      includeAssets: ["icons/icon-{96,120,152,180,192,512}.png"],
       manifest: {
         name: "Sublytics",
         short_name: "Sublytics",

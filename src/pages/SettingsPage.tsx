@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { CURRENCIES } from '../constants/defaults';
 import { logoutAccount } from '../lib/accounts';
+import { PWAInstallButton } from '../components/shared/PWAInstallButton';
 
 export function SettingsPage() {
   const {
@@ -133,6 +134,17 @@ export function SettingsPage() {
               Sign out
             </Button>
           </div>
+        </Card>
+      </motion.div>
+
+      {/* Install App */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <Card>
+          <PWAInstallButton variant="full" />
         </Card>
       </motion.div>
 

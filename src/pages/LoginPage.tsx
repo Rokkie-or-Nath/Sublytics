@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Mail, Lock, Diamond, ArrowRight, Shield, Zap, Eye, EyeOff } from 'lucide-react';
 import { loginAccount } from '../lib/accounts';
 import { useStore } from '../store/useStore';
+import { PWAInstallButton } from '../components/shared/PWAInstallButton';
 
 interface LoginPageProps {
   onSwitchToSignup: () => void;
@@ -195,12 +196,22 @@ export function LoginPage({ onSwitchToSignup }: LoginPageProps) {
         </button>
       </motion.div>
 
+      {/* Install App — available even before sign in */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.55 }}
+        className="mt-6 flex justify-center"
+      >
+        <PWAInstallButton variant="mini" />
+      </motion.div>
+
       {/* Features */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="grid grid-cols-3 gap-3 mt-6"
+        transition={{ delay: 0.6 }}
+        className="grid grid-cols-3 gap-3 mt-4"
       >
         {[
           { icon: Shield, label: 'Secure', desc: 'Bank-level encryption' },
