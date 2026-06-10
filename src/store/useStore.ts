@@ -35,6 +35,7 @@ interface AppState {
   initAuth: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<{ success: true } | { success: false; error: string }>;
+  updateProfile: (settings: { name?: string; avatarUrl?: string }) => Promise<void>;
   setIsDetecting: (detecting: boolean) => void;
   setDetectionProgress: (progress: number) => void;
   setDetectionMessage: (message: string) => void;
@@ -227,6 +228,24 @@ export const useStore = create<AppState>((set) => ({
       selectedCategory: null,
     });
     return { success: true };
+  },
+
+  updateProfile: async (settings) => {
+    try {
+      await service.updateProfile(settings);
+      set((state) => {
+        if (!state.user) return {};
+        return {
+          user: {
+            ...state.user,
+            name: settings.name ?? state.user.name,
+            avatar: settings.avatarUrl ?? state.user.avatar,
+          },
+        };
+      });
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+    }
   },
 
   setIsDetecting: (detecting) => set({ isDetecting: detecting }),

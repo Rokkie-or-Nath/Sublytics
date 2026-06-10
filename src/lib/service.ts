@@ -7,6 +7,7 @@
 import * as db from './db';
 import { supabase } from './supabase';
 import type { User, Subscription, Activity, Insight } from '../types';
+import type { UserSettings } from './db';
 import { DEFAULTS } from '../constants/defaults';
 
 // ─── Auth / session lifecycle ───────────────────────────────────────────────
@@ -100,6 +101,7 @@ export async function loadUserData(): Promise<{
     user: {
       email: profile.email,
       name: profile.name,
+      avatar: profile.avatarUrl,
       joinedAt: profile.joinedAt,
     },
     profile,
@@ -132,6 +134,10 @@ export const addActivity = db.addActivity;
 // ─── Insights ───────────────────────────────────────────────────────────────
 
 export const getInsights = db.getInsights;
+
+// ─── Profile ────────────────────────────────────────────────────────────────
+
+export const updateProfile = db.updateProfile;
 
 // ─── Settings (profile-backed) ──────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ interface ProfileRow {
   id: string;
   email: string;
   name: string | null;
+  avatar_url: string | null;
   joined_at: string;
   currency: string;
   notifications: boolean;
@@ -103,6 +104,7 @@ async function requireUserId(): Promise<string> {
 export interface UserSettings {
   email: string;
   name: string;
+  avatarUrl?: string;
   joinedAt: string;
   currency: string;
   notifications: boolean;
@@ -114,6 +116,7 @@ export interface UserSettings {
 const mapProfile = (r: ProfileRow): UserSettings => ({
   email: r.email,
   name: r.name ?? r.email.split('@')[0],
+  avatarUrl: r.avatar_url ?? undefined,
   joinedAt: r.joined_at,
   currency: r.currency,
   notifications: r.notifications,
@@ -133,8 +136,20 @@ export async function getProfile(): Promise<UserSettings | null> {
   return data ? mapProfile(data) : null;
 }
 
+export async function updateProfile(
+  settings: Partial<Pick<UserSettings, 'name' | 'avatarUrl'>>
+): Promise<void> {
+  const userId = await requireUserId();
+  const update: Record<string, unknown> = { id: userId, updated_at: new Date().toISOString() };
+  if (settings.name !== undefined) update.name = settings.name;
+  if (settings.avatarUrl !== undefined) update.avatar_url = settings.avatarUrl;
+
+  const { error } = await supabase.from('profiles').upsert(update, { onConflict: 'id' });
+  if (error) throw error;
+}
+
 export async function upsertProfileSettings(
-  settings: Partial<Omit<UserSettings, 'email' | 'name' | 'joinedAt'>>
+  settings: Partial<Omit<UserSettings, 'email' | 'name' | 'joinedAt' | 'avatarUrl'>>
 ): Promise<void> {
   const userId = await requireUserId();
   const update: Record<string, unknown> = { id: userId, updated_at: new Date().toISOString() };

@@ -3,10 +3,11 @@ import { useStore } from '../store/useStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { FileUpload } from '../components/shared/FileUpload';
 import { motion } from 'framer-motion';
 import {
   Bell, Mail, FileText, DollarSign, Shield, User,
-  ChevronRight, LogOut, Download, PiggyBank
+  ChevronRight, LogOut, Download, PiggyBank, Save, X
 } from 'lucide-react';
 import { CURRENCIES } from '../constants/defaults';
 import { logoutAccount } from '../lib/accounts';
@@ -17,6 +18,7 @@ export function SettingsPage() {
     user,
     logout,
     deleteAccount,
+    updateProfile,
     currency, setCurrency,
     notifications, setNotifications,
     emailAlerts, setEmailAlerts,
@@ -29,6 +31,12 @@ export function SettingsPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [budgetInput, setBudgetInput] = useState(String(budget));
+
+  // Profile editor state
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(user?.name ?? '');
+  const [editAvatarDataUrl, setEditAvatarDataUrl] = useState(user?.avatar ?? '');
+  const [saving, setSaving] = useState(false);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -93,6 +101,19 @@ export function SettingsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    await updateProfile({ name: editName, avatarUrl: editAvatarDataUrl || undefined });
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditName(user?.name ?? '');
+    setEditAvatarDataUrl(user?.avatar ?? '');
+    setEditing(false);
+  };
+
   const handleUpdateBudget = () => {
     const val = parseInt(budgetInput, 10);
     if (val > 0) {
@@ -102,6 +123,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* Profile — editable */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -117,23 +139,92 @@ export function SettingsPage() {
               <p className="text-sm text-text-muted">Manage your account settings</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center">
-              <span className="text-2xl font-bold text-accent">
-                {user?.name?.trim() ? user.name.charAt(0).toUpperCase() : 'U'}
-              </span>
+
+          {editing ? (
+            <div className="space-y-4">
+              {/* Avatar upload */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Profile picture
+                </label>
+                <FileUpload
+                  currentImage={editAvatarDataUrl}
+                  onFileSelect={setEditAvatarDataUrl}
+                  onRemove={() => setEditAvatarDataUrl('')}
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Name input */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Display name
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
+                />
+              </div>
+
+              {/* Email (read-only) */}
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  Email
+                </label>
+                <input
+                  type="text"
+                  value={user?.email ?? ''}
+                  disabled
+                  className="w-full bg-bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-muted cursor-not-allowed"
+                />
+                <p className="text-xs text-text-muted mt-1">Email cannot be changed</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button variant="ghost" onClick={handleCancelEdit}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  leftIcon={<Save className="w-4 h-4" />}
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
+                </Button>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-text-primary">{user?.name || 'User'}</p>
-              <p className="text-xs text-text-muted truncate">{user?.email || ''}</p>
-              <p className="text-xs text-text-muted mt-0.5">
-                Member since {user?.joinedAt ? formatDate(user.joinedAt) : 'Recently'}
-              </p>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center overflow-hidden shrink-0">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-accent">
+                    {user?.name?.trim() ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text-primary">{user?.name || 'User'}</p>
+                <p className="text-xs text-text-muted truncate">{user?.email || ''}</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Member since {user?.joinedAt ? formatDate(user.joinedAt) : 'Recently'}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setEditName(user?.name ?? ''); setEditAvatarDataUrl(user?.avatar ?? ''); setEditing(true); }}>
+                  Edit
+                </Button>
+                <Button variant="danger" size="sm" leftIcon={<LogOut className="w-3.5 h-3.5" />} onClick={handleLogout}>
+                  Sign out
+                </Button>
+              </div>
             </div>
-            <Button variant="danger" size="sm" leftIcon={<LogOut className="w-3.5 h-3.5" />} onClick={handleLogout}>
-              Sign out
-            </Button>
-          </div>
+          )}
         </Card>
       </motion.div>
 
