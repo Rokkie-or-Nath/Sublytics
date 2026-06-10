@@ -124,10 +124,14 @@ export function Header() {
           <div className="relative group ml-2">
             <div className="flex items-center gap-2 p-1.5 rounded-xl cursor-pointer">
               <div className="relative">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <span className="text-sm font-bold text-accent">
-                    {user?.name?.charAt(0) || 'U'}
-                  </span>
+                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center overflow-hidden">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-accent">
+                      {user?.name?.charAt(0) || 'U'}
+                    </span>
+                  )}
                 </div>
                 {/* Online status dot */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-accent border-2 border-bg-deep rounded-full" />
