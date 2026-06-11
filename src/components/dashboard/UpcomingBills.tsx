@@ -3,6 +3,7 @@ import { Card } from '../ui/Card';
 import { motion } from 'framer-motion';
 import { Calendar, Clock } from 'lucide-react';
 import { formatCurrency, getDaysUntil, formatDate } from '../../utils/formatters';
+import { SubscriptionLogo } from '../shared/SubscriptionLogo';
 
 export function UpcomingBills() {
   const { subscriptions, currency } = useStore();
@@ -34,14 +35,12 @@ export function UpcomingBills() {
               transition={{ delay: 0.8 + index * 0.08 }}
               className="flex items-center gap-3 p-3 rounded-lg bg-bg-elevated/50 border border-border/50"
             >
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${sub.color}15` }}
-              >
-                <span className="text-sm font-bold" style={{ color: sub.color }}>
-                  {sub.name.charAt(0)}
-                </span>
-              </div>
+              <SubscriptionLogo
+                name={sub.name}
+                logoUrl={sub.logo}
+                color={sub.color}
+                size="sm"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">{sub.name}</p>
                 <div className="flex items-center gap-1 mt-0.5">

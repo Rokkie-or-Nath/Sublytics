@@ -4,6 +4,7 @@ import { PRESET_SUBSCRIPTIONS, type PresetSubscription } from '../../constants/p
 import { Search, Check, X, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { formatCurrency } from '../../utils/formatters';
+import { SubscriptionLogo } from '../shared/SubscriptionLogo';
 
 const CATEGORIES = [
   { id: 'all', label: 'All', color: '#8B5CF6' },
@@ -158,15 +159,12 @@ export function QuickAddPanel({ onClose }: QuickAddPanelProps) {
                       : 'border-border bg-bg-surface hover:border-accent/30 hover:bg-bg-elevated hover:shadow-lg hover:shadow-black/10 cursor-pointer'
                   }`}
                 >
-                  {/* Avatar circle */}
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${preset.color}18` }}
-                  >
-                    <span className="text-sm font-bold" style={{ color: preset.color }}>
-                      {preset.name.charAt(0)}
-                    </span>
-                  </div>
+                  {/* Brand logo or fallback letter */}
+                  <SubscriptionLogo
+                    name={preset.name}
+                    color={preset.color}
+                    size="md"
+                  />
 
                   {/* Name + price */}
                   <div className="text-center min-w-0 w-full">

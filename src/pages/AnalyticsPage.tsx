@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import { getMonthlyCost, formatCurrency, getYearlyCost } from '../utils/formatters';
+import { SubscriptionLogo } from '../components/shared/SubscriptionLogo';
 
 export function AnalyticsPage() {
   const { subscriptions, currency } = useStore();
@@ -101,14 +102,11 @@ export function AnalyticsPage() {
           )}
           {topSubscriptions.map((sub, index) => (
             <div key={sub.name} className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${sub.color}18` }}
-              >
-                <span className="text-xs font-bold" style={{ color: sub.color }}>
-                  {sub.name.charAt(0)}
-                </span>
-              </div>
+              <SubscriptionLogo
+                name={sub.name}
+                color={sub.color}
+                size="sm"
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">{sub.name}</p>
                 <div className="h-1.5 bg-bg-elevated rounded-full mt-1 overflow-hidden">

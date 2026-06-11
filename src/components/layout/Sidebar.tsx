@@ -68,8 +68,12 @@ export function Sidebar() {
         {user && (
           <div className="flex items-center gap-3 px-2">
             <div className="relative">
-              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-accent">{user.name.charAt(0)}</span>
+              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-accent">{user.name.charAt(0)}</span>
+                )}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-accent border-2 border-bg-deep rounded-full" />
             </div>

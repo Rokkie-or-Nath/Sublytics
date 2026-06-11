@@ -13,6 +13,37 @@ export function FileUpload({ currentImage, onFileSelect, onRemove, disabled }: F
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState('');
 
+  /**
+   * Resizes and compresses an image to a small thumbnail (150x150 max)
+   * so the base64 string is small enough to store efficiently in the DB.
+   */
+  const compressImage = useCallback((dataUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        // Max dimensions for the thumbnail
+        const MAX = 150;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX || h > MAX) {
+          const ratio = Math.min(MAX / w, MAX / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        // Output as JPEG at 80% quality — small file, good enough for an avatar
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = dataUrl;
+    });
+  }, []);
+
   const handleFile = useCallback((file: File) => {
     setError('');
 
@@ -22,20 +53,26 @@ export function FileUpload({ currentImage, onFileSelect, onRemove, disabled }: F
       return;
     }
 
-    // Validate size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Image must be under 2MB');
+    // Validate size (max 5MB before compression)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
-      onFileSelect(dataUrl);
+      try {
+        // Compress to a small thumbnail before saving
+        const compressed = await compressImage(dataUrl);
+        onFileSelect(compressed);
+      } catch {
+        setError('Failed to process image');
+      }
     };
     reader.onerror = () => setError('Failed to read file');
     reader.readAsDataURL(file);
-  }, [onFileSelect]);
+  }, [onFileSelect, compressImage]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

@@ -231,21 +231,17 @@ export const useStore = create<AppState>((set) => ({
   },
 
   updateProfile: async (settings) => {
-    try {
-      await service.updateProfile(settings);
-      set((state) => {
-        if (!state.user) return {};
-        return {
-          user: {
-            ...state.user,
-            name: settings.name ?? state.user.name,
-            avatar: settings.avatarUrl ?? state.user.avatar,
-          },
-        };
-      });
-    } catch (err) {
-      console.error('Failed to update profile:', err);
-    }
+    await service.updateProfile(settings);
+    set((state) => {
+      if (!state.user) return {};
+      return {
+        user: {
+          ...state.user,
+          name: settings.name ?? state.user.name,
+          avatar: settings.avatarUrl ?? state.user.avatar,
+        },
+      };
+    });
   },
 
   setIsDetecting: (detecting) => set({ isDetecting: detecting }),

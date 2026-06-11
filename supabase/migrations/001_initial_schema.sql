@@ -22,6 +22,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   name text,
+  avatar_url text,
   joined_at timestamptz not null default now(),
   currency text not null default '$',
   notifications boolean not null default true,

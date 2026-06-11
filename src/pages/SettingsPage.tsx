@@ -37,6 +37,7 @@ export function SettingsPage() {
   const [editName, setEditName] = useState(user?.name ?? '');
   const [editAvatarDataUrl, setEditAvatarDataUrl] = useState(user?.avatar ?? '');
   const [saving, setSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -103,15 +104,22 @@ export function SettingsPage() {
 
   const handleSaveProfile = async () => {
     setSaving(true);
-    await updateProfile({ name: editName, avatarUrl: editAvatarDataUrl || undefined });
-    setSaving(false);
-    setEditing(false);
+    setProfileError('');
+    try {
+      await updateProfile({ name: editName, avatarUrl: editAvatarDataUrl || undefined });
+      setEditing(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancelEdit = () => {
     setEditName(user?.name ?? '');
     setEditAvatarDataUrl(user?.avatar ?? '');
     setEditing(false);
+    setProfileError('');
   };
 
   const handleUpdateBudget = () => {
@@ -183,9 +191,14 @@ export function SettingsPage() {
                 <p className="text-xs text-text-muted mt-1">Email cannot be changed</p>
               </div>
 
+              {/* Error message */}
+              {profileError && (
+                <p className="text-xs text-danger bg-danger/10 rounded-lg px-3 py-2">{profileError}</p>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Button variant="ghost" onClick={handleCancelEdit}>
+                <Button variant="ghost" onClick={handleCancelEdit} disabled={saving}>
                   Cancel
                 </Button>
                 <Button
@@ -216,7 +229,7 @@ export function SettingsPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => { setEditName(user?.name ?? ''); setEditAvatarDataUrl(user?.avatar ?? ''); setEditing(true); }}>
+                <Button variant="ghost" size="sm" onClick={() => { setEditName(user?.name ?? ''); setEditAvatarDataUrl(user?.avatar ?? ''); setEditing(true); setProfileError(''); }}>
                   Edit
                 </Button>
                 <Button variant="danger" size="sm" leftIcon={<LogOut className="w-3.5 h-3.5" />} onClick={handleLogout}>

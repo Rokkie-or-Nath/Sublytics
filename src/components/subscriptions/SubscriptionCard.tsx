@@ -3,6 +3,7 @@ import { Badge } from '../ui/Badge';
 import { motion } from 'framer-motion';
 import { Pause, Play, Trash2, Calendar } from 'lucide-react';
 import { formatCurrency, getDaysUntil } from '../../utils/formatters';
+import { SubscriptionLogo } from '../shared/SubscriptionLogo';
 import type { Subscription } from '../../types';
 
 interface SubscriptionCardProps {
@@ -25,14 +26,11 @@ export function SubscriptionCard({ subscription, index }: SubscriptionCardProps)
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${subscription.color}18` }}
-          >
-            <span className="text-base font-bold" style={{ color: subscription.color }}>
-              {subscription.name.charAt(0)}
-            </span>
-          </div>
+          <SubscriptionLogo
+            name={subscription.name}
+            logoUrl={subscription.logo}
+            color={subscription.color}
+          />
           <div>
             <h4 className="text-sm font-semibold text-text-primary">{subscription.name}</h4>
             <p className="text-xs text-text-muted capitalize">{subscription.category}</p>
